@@ -1,0 +1,325 @@
+/* Main Footer Section */
+.footer-section {
+  position: relative;
+  background-color: #FAF7F2;
+  color: #5A0000;
+  padding: 4.5rem 0 0 0;
+  overflow: hidden;
+}
+
+/* Background Building Architectural Sketch */
+.footer-building-sketch {
+  position: absolute;
+  right: 0;
+  bottom: 25px;
+  width: 780px;
+  max-width: 65%;
+  height: auto;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.95;
+  mix-blend-mode: multiply;
+}
+
+.footer-building-sketch img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.footer-container {
+  position: relative;
+  z-index: 5;
+}
+
+/* Footer Main Layout Grid with Vertical Dividers */
+.footer-main-layout {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 3.5rem;
+}
+
+.footer-brand-col {
+  flex: 1.3;
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-contact-col,
+.footer-address-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Vertical Dividers with Diamond Icon */
+.vertical-divider {
+  position: relative;
+  width: 1px;
+  align-self: stretch;
+  background-color: rgba(90, 0, 0, 0.15);
+  margin: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.v-diamond {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #C89A5B;
+  font-size: 0.65rem;
+  background-color: #FAF7F2;
+  padding: 4px 0;
+}
+
+/* Left Brand Header */
+.footer-brand-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.footer-crest-logo {
+  height: 110px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.footer-brand-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-brand-main {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #5A0000;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.footer-brand-sub {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #2D3748;
+  margin-top: 2px;
+}
+
+/* Horizontal Diamond Accent Line */
+.diamond-accent-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0.65rem 0 0.85rem 0;
+}
+
+.accent-bar {
+  width: 44px;
+  height: 1.5px;
+  background-color: #D9BE9B;
+}
+
+.accent-diamond {
+  color: #C89A5B;
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+.footer-tagline {
+  font-size: 0.95rem;
+  color: #555555;
+  line-height: 1.5;
+}
+
+/* Social Icon Buttons (White Circle with Maroon Icon) */
+.footer-social-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.social-icon-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(90, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(90, 0, 0, 0.08);
+  text-decoration: none;
+}
+
+.social-icon-btn:hover {
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: 0 8px 22px rgba(90, 0, 0, 0.15);
+  border-color: rgba(90, 0, 0, 0.2);
+}
+
+/* Section Column Headings */
+.footer-col-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #5A0000;
+  margin-bottom: 0.2rem;
+}
+
+/* Contact & Address Items */
+.footer-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+}
+
+.footer-contact-list .contact-item:first-child {
+  border-bottom: 1px solid rgba(90, 0, 0, 0.06);
+}
+
+.contact-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background-color: #F6EAE1;
+  color: #5A0000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(90, 0, 0, 0.08);
+}
+
+.contact-text-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.contact-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #4A0000;
+  margin-bottom: 2px;
+}
+
+.contact-value {
+  font-size: 0.95rem;
+  color: #4A5568;
+  text-decoration: none;
+  transition: color 0.25s ease;
+}
+
+.contact-value:hover {
+  color: #5A0000;
+}
+
+.address-text {
+  line-height: 1.6;
+}
+
+/* Bottom Wave Divider */
+.footer-wave-divider {
+  width: 100%;
+  line-height: 0;
+  background: transparent;
+}
+
+.footer-wave-divider svg {
+  width: 100%;
+  height: 45px;
+  display: block;
+}
+
+/* Bottom Copyright Bar */
+.footer-bottom-bar {
+  position: relative;
+  background: linear-gradient(180deg, #4A0000 0%, #300000 100%);
+  padding: 1.1rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+/* Diagonal Hatching Pattern on Left Side */
+.bottom-bar-waves {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 280px;
+  height: 100%;
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0, rgba(255, 255, 255, 0.07) 2px, transparent 0, transparent 8px);
+  mask-image: linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%);
+  pointer-events: none;
+}
+
+.footer-bottom-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  font-size: 0.95rem;
+  color: #FFFFFF;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.gold-shield-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #D4AF37;
+  border: 1.5px solid #D4AF37;
+  border-radius: 5px;
+  padding: 2px 6px;
+  background-color: transparent;
+}
+
+.bar-pipe {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 300;
+  font-size: 1.1rem;
+}
+
+/* Responsiveness */
+@media (max-width: 992px) {
+  .footer-main-layout {
+    flex-direction: column;
+    gap: 2.5rem;
+  }
+
+  .vertical-divider {
+    display: none;
+  }
+
+  .footer-brand-col,
+  .footer-contact-col,
+  .footer-address-col {
+    width: 100%;
+    border-bottom: 1px solid rgba(90, 0, 0, 0.08);
+    padding-bottom: 2rem;
+  }
+
+  .footer-address-col {
+    border-bottom: none;
+  }
+}
+
+
+

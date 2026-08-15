@@ -1,0 +1,216 @@
+.hero-section {
+  width: 100%;
+  min-height: calc(100vh - 75px);
+  height: calc(100vh - 75px);
+  background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('/mcc.jpeg') no-repeat center center / cover;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 860px;
+  margin: 0 auto;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  backdrop-filter: none;
+}
+
+.hero-badge {
+  display: inline-block;
+  background-color: rgba(255, 255, 255, 0.9);
+  color: #800000;
+  border: 1.5px solid #800000;
+  padding: 0.35rem 1.25rem;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 1.25rem;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.hero-title {
+  font-size: 3.35rem;
+  font-weight: 900;
+  color: #FFFFFF;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.highlight-text {
+  color: #800000;
+  text-shadow: 0 2px 10px rgba(255, 255, 255, 0.95), 0 0 3px #FFFFFF;
+}
+
+.hero-subtitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+.hero-description {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #F8F9FA;
+  line-height: 1.7;
+  max-width: 700px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+}
+
+/* Right column animated graphic container */
+.hero-graphic-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+}
+
+.hero-svg-wrapper {
+  width: 100%;
+  max-width: 442px;
+  height: auto;
+  aspect-ratio: 452 / 428;
+}
+
+/* Completely Static Circular Ring */
+.hero-ring {
+  stroke: #8B0000;
+  stroke-width: 3px;
+}
+
+/* Rich Semi-transparent Node Styling (opacity: 0.82) */
+.hero-node {
+  fill: #A83232;
+  fill-opacity: 0.82;
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* Phase-shifted vertical floating animations */
+.hero-node-top {
+  animation: floatNode 3.6s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.hero-node-right {
+  animation: floatNode 3.6s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.hero-node-left {
+  animation: floatNode 3.6s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+/* Keyframes: Pure vertical translation (translateY) only */
+@keyframes floatNode {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  25% {
+    transform: translateY(-9px);
+  }
+
+  50% {
+    transform: translateY(0);
+  }
+
+  75% {
+    transform: translateY(9px);
+  }
+}
+
+/* Accessibility: Disable animation if reduced motion is requested */
+@media (prefers-reduced-motion: reduce) {
+  .hero-node {
+    animation: none !important;
+  }
+}
+
+/* Tablet responsiveness */
+@media (max-width: 992px) {
+  .hero-title {
+    font-size: 2.6rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.2rem;
+  }
+
+  .hero-container {
+    gap: 2rem;
+  }
+
+  .hero-svg-wrapper {
+    max-width: 360px;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .hero-section {
+    min-height: calc(100vh - 75px);
+    height: auto;
+    padding: 2rem 1rem;
+  }
+
+  .hero-content {
+    padding: 2rem 1.5rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-title {
+    font-size: 2.2rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1.1rem;
+  }
+
+  .hero-description {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-title {
+    font-size: 1.8rem;
+  }
+  .hero-content {
+    padding: 1.75rem 1.25rem;
+  }
+  .hero-svg-wrapper {
+    max-width: 260px;
+  }
+}

@@ -1,0 +1,168 @@
+.about-section {
+  background-color: #FAF8F5;
+  padding: 5.5rem 0 6.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 3.5rem;
+}
+
+.section-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: #800000;
+  letter-spacing: -0.02em;
+  position: relative;
+  display: inline-block;
+}
+
+.section-title::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 3px;
+  background-color: #800000;
+  margin: 0.75rem auto 0 auto;
+  border-radius: 2px;
+}
+
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.75rem;
+}
+
+/* Feature card styles - Exact match to user mockup */
+.feature-card {
+  position: relative;
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  padding: 2.75rem 1.5rem 3.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  border-bottom: 3.5px solid #800000;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Top-left maroon triangle accent notch */
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-top: 18px solid #800000;
+  border-right: 18px solid transparent;
+  border-top-left-radius: 12px;
+  z-index: 1;
+}
+
+.feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 15px 35px rgba(128, 0, 0, 0.12);
+}
+
+/* Concentric Circle Icon Graphic with Orbit Dot */
+.feature-icon-outer-ring {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(128, 0, 0, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.orbit-dot {
+  position: absolute;
+  top: 18px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #800000;
+}
+
+.feature-icon-inner-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background-color: #FAF0F0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feature-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #800000;
+  margin-bottom: 0.6rem;
+  line-height: 1.3;
+}
+
+.feature-title-divider {
+  width: 32px;
+  height: 2px;
+  background-color: #800000;
+  margin: 0.4rem auto 1.25rem auto;
+  border-radius: 2px;
+}
+
+.feature-description {
+  font-size: 0.95rem;
+  color: #555555;
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* Bottom Semicircle Number Badge */
+.feature-number-badge {
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #FFFFFF;
+  border: 2px solid #800000;
+  border-bottom: none;
+  border-radius: 50px 50px 0 0;
+  padding: 0.2rem 1.15rem 0.05rem 1.15rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #800000;
+  line-height: 1.2;
+}
+
+/* Tablet responsiveness */
+@media (max-width: 992px) {
+  .about-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.75rem;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 576px) {
+  .about-section {
+    padding: 3.5rem 0 4.5rem 0;
+  }
+
+  .about-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .section-title {
+    font-size: 1.85rem;
+  }
+}

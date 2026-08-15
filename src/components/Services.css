@@ -1,0 +1,346 @@
+/* Services Section Main Container */
+.services-section {
+  position: relative;
+  background: linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%);
+  padding: 5rem 0 6rem 0;
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.services-container {
+  position: relative;
+  z-index: 2;
+}
+
+.services-section .section-header {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 2.5rem auto;
+}
+
+.services-section .section-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--primary-maroon);
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.services-section .section-subtitle {
+  font-size: 1.05rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* Desktop Arc Canvas Container */
+.services-arc-wrapper {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Subtle Architectural Dot Grid Pattern Background */
+.services-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(139, 0, 0, 0.12) 1.2px, transparent 1.2px);
+  background-size: 28px 28px;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+/* Right Side Faint Cityscape Silhouette Graphic */
+.services-cityscape-bg {
+  position: absolute;
+  right: 0;
+  bottom: -20px;
+  width: 380px;
+  height: 100%;
+  pointer-events: none;
+  color: var(--primary-maroon);
+  opacity: 0.85;
+}
+
+.services-cityscape-bg svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Curved Dashed SVG Arc Line */
+.services-arc-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Central Active Content Box */
+.services-center-content {
+  position: relative;
+  z-index: 10;
+  max-width: 580px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 1.5rem;
+  margin-top: 2rem;
+}
+
+/* Diamond Icon Frame */
+.active-diamond-box {
+  width: 54px;
+  height: 54px;
+  margin-bottom: 1.25rem;
+  border: 2px solid var(--primary-maroon);
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFFFFF;
+  box-shadow: 0 8px 24px rgba(139, 0, 0, 0.14);
+  border-radius: 4px;
+  animation: diamondPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.diamond-inner {
+  transform: rotate(-45deg);
+  color: var(--primary-maroon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Active Service Title */
+.active-service-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #1E293B;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.015em;
+  animation: titleFadeIn 0.35s ease-out;
+}
+
+/* Accent Underline Bar */
+.active-title-underline {
+  width: 44px;
+  height: 4px;
+  background-color: var(--primary-maroon);
+  border-radius: 2px;
+  margin-bottom: 1.25rem;
+}
+
+/* Active Service Description */
+.active-service-desc {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #64748B;
+  max-width: 540px;
+  margin: 0 auto;
+  animation: descFadeIn 0.4s ease-out;
+}
+
+/* Arc Node Buttons Container */
+.services-nodes-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+
+/* Individual Interactive Node Item along the Arc */
+.service-node-item {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.node-button-wrapper {
+  position: relative;
+  border-radius: 50%;
+  padding: 5px;
+  transition: all 0.35s ease;
+}
+
+.node-button {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFFFFF;
+  border: 1.5px solid rgba(139, 0, 0, 0.2);
+  color: var(--primary-maroon);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+  transition: all 0.35s ease;
+}
+
+/* Active Node Styling (Filled primary maroon, glow ring outline) */
+.service-node-item.active .node-button-wrapper {
+  box-shadow: 0 0 0 6px rgba(139, 0, 0, 0.16), 0 10px 28px rgba(139, 0, 0, 0.25);
+  border-radius: 50%;
+}
+
+.service-node-item.active .node-button {
+  background-color: var(--primary-maroon);
+  color: #FFFFFF;
+  border-color: var(--primary-maroon);
+  transform: scale(1.1);
+}
+
+/* Node Button Hover Effects */
+.service-node-item:hover .node-button {
+  transform: scale(1.12);
+  box-shadow: 0 8px 22px rgba(139, 0, 0, 0.2);
+  border-color: var(--primary-maroon);
+}
+
+.service-node-item:hover .node-label {
+  color: var(--primary-maroon);
+}
+
+/* Node Label underneath circle button */
+.node-label {
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #475569;
+  text-align: center;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.service-node-item.active .node-label {
+  color: var(--primary-maroon);
+  font-weight: 900;
+}
+
+/* Mobile Switcher & Cards */
+.services-mobile-nav {
+  display: none;
+}
+
+/* Animations */
+@keyframes diamondPop {
+  0% {
+    transform: rotate(45deg) scale(0.7);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(45deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes titleFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes descFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive Styles */
+@media (max-width: 1024px) {
+  .services-arc-wrapper {
+    height: 440px;
+  }
+
+  .node-button {
+    width: 58px;
+    height: 58px;
+  }
+
+  .active-service-title {
+    font-size: 1.85rem;
+  }
+
+  .node-label {
+    font-size: 0.75rem;
+  }
+}
+
+/* Mobile Responsiveness (< 768px) */
+@media (max-width: 768px) {
+  .services-arc-wrapper {
+    display: none;
+  }
+
+  .services-mobile-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+
+  .mobile-nodes-pills {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .mobile-node-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1rem;
+    background-color: #FFFFFF;
+    border: 1.5px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    transition: all 0.25s ease;
+  }
+
+  .mobile-node-pill.active {
+    background-color: var(--primary-maroon);
+    border-color: var(--primary-maroon);
+    color: #FFFFFF;
+    box-shadow: 0 4px 14px rgba(139, 0, 0, 0.2);
+  }
+
+  .mobile-service-card {
+    background-color: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  }
+}
+
