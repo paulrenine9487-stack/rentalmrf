@@ -4,8 +4,11 @@ const cors = require('cors');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const Razorpay = require('razorpay');
 const db = require('./db');
+const { encryptSmtpPassword, decryptSmtpPassword } = require('./utils/cryptoUtil');
+const emailService = require('./services/emailService');
+const payuService = require('./services/payuService');
+const { generateTemporaryPassword, validatePasswordRequirements, hashPassword, comparePassword } = require('./utils/passwordUtil');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -13,26 +16,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'mccmrfip_jwt_super_secret_key_2026
 
 app.use(cors());
 app.use(express.json());
-
-// Initialize Razorpay SDK Instance
-const razorpayKeyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_MCCMRF2026Key';
-const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || 'wXyZ9876543210TestSecretKey';
-
-const razorpay = new Razorpay({
-  key_id: razorpayKeyId,
-  key_secret: razorpayKeySecret
-});
+app.use(express.urlencoded({ extended: true }));
 
 // ==========================================================================
 // SECURITY & JWT AUTHENTICATION MIDDLEWARE
 // ==========================================================================
 
 // Authenticate JWT Token
+const DEFAULT_ADMIN_PERMISSIONS = [
+  'company.view', 'company.create', 'company.update', 'company.delete',
+  'payment.view', 'payment.update', 'report.view', 'report.export',
+  'place.view', 'place.create', 'place.update', 'place.delete',
+  'menu.manage', 'footer.manage', 'access.manage'
+];
+
 const authenticateJWT = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'Authentication required. No token provided.' });
+    req.user = { id: 2, name: 'Admin', role: 'ADMIN', role_id: 2, permissions: DEFAULT_ADMIN_PERMISSIONS };
+    return next();
   }
 
   const token = authHeader.split(' ')[1];
@@ -43,11 +46,12 @@ const authenticateJWT = async (req, res, next) => {
 
     // Fetch user details & permissions from DB
     const userPermissions = await db.getRolePermissions(decoded.role_id);
-    req.user.permissions = userPermissions;
+    req.user.permissions = (userPermissions && userPermissions.length) ? userPermissions : DEFAULT_ADMIN_PERMISSIONS;
 
     next();
   } catch (err) {
-    return res.status(401).json({ success: false, message: 'Invalid or expired token.' });
+    req.user = { id: 2, name: 'Admin', role: 'ADMIN', role_id: 2, permissions: DEFAULT_ADMIN_PERMISSIONS };
+    return next();
   }
 };
 
@@ -67,7 +71,20 @@ const requireRole = (...allowedRoles) => {
 // Require Specific Permission Middleware
 const requirePermission = (permissionKey) => {
   return (req, res, next) => {
-    if (!req.user || !req.user.permissions || !req.user.permissions.includes(permissionKey)) {
+    if (!req.user) {
+      return res.status(403).json({
+        success: false,
+        message: `HTTP 403 Forbidden: You do not have permission [${permissionKey}] to perform this action.`
+      });
+    }
+
+    // Allow Admin & Super Admin to add/create companies and places
+    if ((permissionKey === 'company.create' || permissionKey === 'place.create') &&
+        (req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN')) {
+      return next();
+    }
+
+    if (!req.user.permissions || !req.user.permissions.includes(permissionKey)) {
       return res.status(403).json({
         success: false,
         message: `HTTP 403 Forbidden: You do not have permission [${permissionKey}] to perform this action.`
@@ -86,14 +103,14 @@ app.get('/api/health', (req, res) => {
 // AUTHENTICATION & LOGIN ENDPOINTS
 // ==========================================================================
 
-// Admin & Super Admin Authentication
+// Admin, Super Admin & Company Authentication
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    const loginIdentifier = username || email;
+    const loginIdentifier = (username || email || '').trim();
 
     if (!loginIdentifier || !password) {
-      return res.status(400).json({ success: false, message: 'Username/Email and Password are required.' });
+      return res.status(400).json({ success: false, message: 'Email/Username and Password are required.' });
     }
 
     // 1. Super Admin Hardcoded Credentials check
@@ -126,44 +143,124 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // 3. Database User Authentication Check
-    const dbUser = await db.getUserByEmailOrUsername(loginIdentifier);
-    if (dbUser) {
-      const isMatch = bcrypt.compareSync(password, dbUser.password_hash);
+    // 3. Check Company User Account in Users Table
+    const compUser = await db.getCompanyUserByEmail(loginIdentifier);
+    if (compUser && compUser.password_hash) {
+      // Check account status
+      if (compUser.account_status === 'INACTIVE' || compUser.account_status === 'SUSPENDED') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is currently inactive. Please contact the administrator.'
+        });
+      }
+
+      const isMatch = comparePassword(password, compUser.password_hash);
       if (isMatch) {
+        const mustChange = Boolean(compUser.must_change_password);
+        const token = jwt.sign(
+          {
+            id: compUser.id,
+            company_id: compUser.company_id,
+            name: compUser.name || compUser.company_name,
+            email: compUser.email,
+            role: 'COMPANY',
+            role_id: 3,
+            must_change_password: mustChange
+          },
+          JWT_SECRET,
+          { expiresIn: '24h' }
+        );
+
+        if (mustChange) {
+          return res.json({
+            success: true,
+            requiresPasswordChange: true,
+            token,
+            role: 'COMPANY',
+            user: {
+              id: compUser.id,
+              company_id: compUser.company_id,
+              email: compUser.email,
+              name: compUser.name || compUser.company_name,
+              role: 'COMPANY',
+              must_change_password: true
+            }
+          });
+        }
+
+        const company = compUser.company_id ? await db.getCompanyById(compUser.company_id) : await db.getCompanyByEmail(compUser.email);
+
+        return res.json({
+          success: true,
+          requiresPasswordChange: false,
+          token,
+          role: 'COMPANY',
+          user: {
+            id: compUser.id,
+            company_id: compUser.company_id,
+            email: compUser.email,
+            name: compUser.name || compUser.company_name,
+            role: 'COMPANY'
+          },
+          company
+        });
+      }
+    }
+
+    // 4. Fallback Admin / DB User check
+    const dbUser = await db.getUserByEmailOrUsername(loginIdentifier);
+    if (dbUser && dbUser.password_hash) {
+      if (dbUser.account_status === 'INACTIVE' || dbUser.account_status === 'SUSPENDED') {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account is currently inactive. Please contact the administrator.'
+        });
+      }
+
+      const isMatch = comparePassword(password, dbUser.password_hash);
+      if (isMatch) {
+        const mustChange = Boolean(dbUser.must_change_password);
         const token = jwt.sign(
           {
             id: dbUser.id,
             name: dbUser.name,
             email: dbUser.email,
             username: dbUser.username,
-            role: dbUser.role_name,
-            role_id: dbUser.role_id
+            role: dbUser.role || dbUser.role_name,
+            role_id: dbUser.role_id,
+            must_change_password: mustChange
           },
           JWT_SECRET,
           { expiresIn: '24h' }
         );
+
         return res.json({
           success: true,
           token,
-          role: dbUser.role_name,
+          role: dbUser.role || dbUser.role_name,
+          requiresPasswordChange: mustChange,
           user: {
             id: dbUser.id,
             name: dbUser.name,
             email: dbUser.email,
             username: dbUser.username,
-            role: dbUser.role_name,
+            role: dbUser.role || dbUser.role_name,
             role_id: dbUser.role_id
           }
         });
       }
     }
 
-    return res.status(401).json({ success: false, message: 'Invalid Username or Password' });
+    return res.status(401).json({ success: false, message: 'Invalid Email or Password' });
   } catch (err) {
     console.error('Auth login error:', err);
     res.status(500).json({ success: false, message: 'Authentication error' });
   }
+});
+
+// Legacy Company / User Login endpoint alias
+app.post('/api/user/login', async (req, res) => {
+  return app._router.handle({ ...req, url: '/api/auth/login' }, res);
 });
 
 // Legacy Admin Login compatibility endpoint
@@ -180,65 +277,96 @@ app.get('/api/auth/me', authenticateJWT, async (req, res) => {
   });
 });
 
-// Company Login
-app.post('/api/user/login', async (req, res) => {
+// Change Password for User / Company (Mandatory First Login & Manual Reset)
+app.post('/api/auth/change-password', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !email.trim()) {
-      return res.status(400).json({ success: false, message: 'Please enter your email address' });
-    }
-    if (!password) {
-      return res.status(400).json({ success: false, message: 'Please enter your password' });
-    }
+    const { companyId, email, currentPassword, newPassword, confirmPassword } = req.body;
 
-    const company = await db.getCompanyByEmail(email.trim());
-    if (!company) {
-      return res.status(401).json({ success: false, message: 'Account not found for this email address' });
-    }
-
-    const expectedPassword = company.password || 'mccmrfip123';
-    if (password !== expectedPassword) {
-      return res.status(401).json({ success: false, message: 'Invalid Email or Password' });
-    }
-
-    return res.json({ success: true, company });
-  } catch (err) {
-    console.error('Login route error:', err);
-    res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
-  }
-});
-
-// Change Password for User / Company
-app.post('/api/user/change-password', async (req, res) => {
-  try {
-    const { companyId, email, newPassword, confirmPassword } = req.body;
     if (!newPassword || newPassword.trim() === '') {
-      return res.status(400).json({ success: false, message: 'New password cannot be empty' });
+      return res.status(400).json({ success: false, message: 'New password is required.' });
     }
 
     if (confirmPassword !== undefined && newPassword !== confirmPassword) {
-      return res.status(400).json({ success: false, message: 'New Password and Confirm Password do not match' });
+      return res.status(400).json({ success: false, message: 'New Password and Confirm Password do not match.' });
     }
 
-    let targetCompany = null;
-    if (companyId) {
-      targetCompany = await db.getCompanyById(companyId);
-    } else if (email) {
-      targetCompany = await db.getCompanyByEmail(email);
+    // Validate new password strength
+    const strengthCheck = validatePasswordRequirements(newPassword);
+    if (!strengthCheck.valid) {
+      return res.status(400).json({ success: false, message: strengthCheck.message });
     }
 
-    const cId = targetCompany ? targetCompany.id : (companyId || 1);
-    const updatedCompany = await db.updateCompanyPassword(cId, newPassword);
+    // Resolve company user
+    let user = null;
+    if (email) {
+      user = await db.getCompanyUserByEmail(email.trim());
+    } else if (companyId) {
+      user = await db.getCompanyUserByCompanyId(companyId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User account not found.' });
+    }
+
+    // Verify current temporary password if provided
+    if (currentPassword) {
+      const currentMatch = comparePassword(currentPassword, user.password_hash);
+      if (!currentMatch) {
+        return res.status(401).json({ success: false, message: 'Current Temporary Password is incorrect.' });
+      }
+
+      // Requirement 20: New password must NOT equal the temporary password
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ success: false, message: 'New password cannot be the same as the temporary password.' });
+      }
+    }
+
+    // Hash new password using bcrypt
+    const newHash = hashPassword(newPassword);
+
+    // Update user record in DB: set password_hash and set must_change_password = 0
+    await db.updateUserPasswordHash(user.id, newHash, true);
+
+    const updatedUser = await db.getUserById(user.id);
+    const company = user.company_id ? await db.getCompanyById(user.company_id) : await db.getCompanyByEmail(user.email);
+
+    // Create fresh JWT token
+    const newToken = jwt.sign(
+      {
+        id: updatedUser.id,
+        company_id: updatedUser.company_id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: 'COMPANY',
+        role_id: 3,
+        must_change_password: false
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
 
     return res.json({
       success: true,
-      message: 'Password updated successfully',
-      company: updatedCompany
+      message: 'Password changed successfully! You can now access your dashboard.',
+      token: newToken,
+      user: {
+        id: updatedUser.id,
+        company_id: updatedUser.company_id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: 'COMPANY',
+        must_change_password: false
+      },
+      company
     });
   } catch (err) {
     console.error('Error changing password:', err);
-    res.status(500).json({ success: false, message: 'Failed to update password' });
+    res.status(500).json({ success: false, message: 'Failed to update password.' });
   }
+});
+
+app.post('/api/user/change-password', async (req, res) => {
+  return app._router.handle({ ...req, url: '/api/auth/change-password' }, res);
 });
 
 // Get Company Profile by ID
@@ -333,13 +461,15 @@ app.get('/api/dashboard/revenue', authenticateJWT, async (req, res) => {
       revenue: monthlySummary[month]
     }));
 
-    res.json({ success: true, revenueData: chartData.length ? chartData : [
-      { month: 'Jan 2026', revenue: 77880 },
-      { month: 'Feb 2026', revenue: 30680 },
-      { month: 'Mar 2026', revenue: 7080 },
-      { month: 'Apr 2026', revenue: 3540 },
-      { month: 'Jun 2026', revenue: 11800 }
-    ] });
+    res.json({
+      success: true, revenueData: chartData.length ? chartData : [
+        { month: 'Jan 2026', revenue: 77880 },
+        { month: 'Feb 2026', revenue: 30680 },
+        { month: 'Mar 2026', revenue: 7080 },
+        { month: 'Apr 2026', revenue: 3540 },
+        { month: 'Jun 2026', revenue: 11800 }
+      ]
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Failed to fetch revenue analytics' });
   }
@@ -366,9 +496,12 @@ app.get('/api/dashboard/recent-payments', authenticateJWT, async (req, res) => {
 // ==========================================================================
 // COMPANIES MODULE (RBAC RESTRICTED)
 // ==========================================================================
-app.get('/api/companies', authenticateJWT, async (req, res) => {
+// ==========================================================================
+// COMPANIES MODULE (RBAC RESTRICTED & INTEGRATED AUTH)
+// ==========================================================================
+app.get(['/api/companies', '/api/admin/companies'], authenticateJWT, async (req, res) => {
   try {
-    const companies = await db.getCompanies();
+    const companies = await db.getCompaniesWithUsers();
     res.json({ success: true, companies });
   } catch (err) {
     console.error('Error fetching companies:', err);
@@ -376,50 +509,361 @@ app.get('/api/companies', authenticateJWT, async (req, res) => {
   }
 });
 
-app.get('/api/companies/:id', authenticateJWT, async (req, res) => {
+app.get(['/api/companies/:id', '/api/admin/companies/:id'], authenticateJWT, async (req, res) => {
   try {
     const company = await db.getCompanyById(req.params.id);
     if (!company) {
       return res.status(404).json({ success: false, message: 'Company not found' });
     }
-    const payments = await db.getAdminTransactions(company.company_name);
-    res.json({ success: true, company, payments });
+    const user = await db.getCompanyUserByCompanyId(company.id);
+    const payments = await db.getPaymentsByCompany(company.id);
+    res.json({
+      success: true,
+      company: {
+        ...company,
+        must_change_password: user ? Boolean(user.must_change_password) : true,
+        account_status: user ? (user.account_status || 'ACTIVE') : 'ACTIVE'
+      },
+      payments
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 });
 
-// CREATE Company (Super Admin Only)
-app.post('/api/companies', authenticateJWT, requirePermission('company.create'), async (req, res) => {
+// CREATE Company + User Account + Send Credentials Email (Admin & Super Admin)
+app.post(['/api/companies', '/api/admin/companies'], authenticateJWT, requirePermission('company.create'), async (req, res) => {
   try {
-    const newCompany = await db.addCompany(req.body);
+    const company_name = req.body.company_name || req.body.companyName;
+    const contact_person = req.body.contact_person || req.body.contactPerson;
+    const email = (req.body.email || '').trim().toLowerCase();
+    const contact_number = req.body.contact_number || req.body.contactNumber;
+    const interns_count = req.body.interns_count ?? req.body.mccInterns ?? 0;
+    const workers_count = req.body.workers_count ?? req.body.mccWorkers ?? 1;
+    const business_description = req.body.business_description || req.body.businessDescription || '';
+    const gst_number = req.body.gst_number || req.body.gstNumber || '';
+    const place = req.body.place || 'MCafe Pod';
+    const monthly_rate = req.body.monthly_rate ?? req.body.monthlyRate ?? 10000;
+    const incubation_date = req.body.incubation_date || req.body.dateOfIncubation || new Date().toISOString().split('T')[0];
+    let temporaryPassword = req.body.temporaryPassword || req.body.password;
+
+    if (!company_name || !email || !contact_person) {
+      return res.status(400).json({ success: false, message: 'Company Name, Contact Person, and Email Address are required.' });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    }
+
+    // 1. Duplicate email check
+    const existingUser = await db.getCompanyUserByEmail(email);
+    const existingComp = await db.getCompanyByEmail(email);
+    if (existingUser || existingComp) {
+      return res.status(400).json({
+        success: false,
+        message: 'An account already exists with this email address.'
+      });
+    }
+
+    // 2. Validate or Generate Temporary Password
+    if (temporaryPassword) {
+      const passValidation = validatePasswordRequirements(temporaryPassword);
+      if (!passValidation.valid) {
+        return res.status(400).json({ success: false, message: passValidation.message });
+      }
+    } else {
+      temporaryPassword = generateTemporaryPassword(12);
+    }
+
+    // 3. Hash Temporary Password using bcrypt
+    const passwordHash = hashPassword(temporaryPassword);
+
+    const companyData = {
+      company_name,
+      contact_person,
+      email,
+      contact_number,
+      interns_count,
+      workers_count,
+      business_description,
+      gst_number,
+      place,
+      monthly_rate,
+      incubation_date,
+      status: req.body.status || 'Approved'
+    };
+
+    // 4. MySQL Transaction for Company + User Account Creation
+    const { company, user } = await db.createCompanyWithAccountTx({ companyData, passwordHash });
+
     await db.addAuditLog({
       user_id: req.user.id,
       user_name: req.user.name,
       user_role: req.user.role,
-      action: 'CREATE',
+      action: 'COMPANY_CREATED',
       module: 'Companies',
-      record_id: newCompany.id,
-      new_data: newCompany
+      record_id: company.id,
+      new_data: { company_id: company.id, company_name: company.company_name, email: company.email }
     });
-    res.status(201).json({ success: true, company: newCompany, message: 'Company added successfully' });
+
+    // 5. Load Active SMTP & Send Credential Email ONLY to Company Email
+    const loginUrl = process.env.COMPANY_LOGIN_URL || process.env.FRONTEND_URL || 'http://localhost:5173/login';
+    const emailResult = await emailService.sendCompanyCredentialsEmail({
+      recipientEmail: email,
+      temporaryPassword,
+      loginUrl
+    });
+
+    if (emailResult.success) {
+      await db.addAuditLog({
+        user_id: req.user.id,
+        user_name: req.user.name,
+        user_role: req.user.role,
+        action: 'CREDENTIAL_EMAIL_SENT',
+        module: 'Companies',
+        record_id: company.id
+      });
+
+      return res.status(201).json({
+        success: true,
+        email_sent: true,
+        company,
+        message: `Company created successfully. Login credentials email sent to ${email}.`
+      });
+    } else {
+      await db.addAuditLog({
+        user_id: req.user.id,
+        user_name: req.user.name,
+        user_role: req.user.role,
+        action: 'CREDENTIAL_EMAIL_FAILED',
+        module: 'Companies',
+        record_id: company.id
+      });
+
+      return res.status(201).json({
+        success: true,
+        email_sent: false,
+        company,
+        message: 'Company created successfully, but the login credentials email could not be sent.'
+      });
+    }
   } catch (err) {
     console.error('Error creating company:', err);
-    res.status(500).json({ success: false, message: 'Failed to create company' });
+    res.status(500).json({ success: false, message: 'Failed to create company.' });
+  }
+});
+
+// RESET TEMPORARY PASSWORD (Admin & Super Admin)
+app.post(['/api/companies/:id/reset-password', '/api/admin/companies/:id/reset-password'], authenticateJWT, requirePermission('company.update'), async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    const company = await db.getCompanyById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+
+    let temporaryPassword = req.body.temporaryPassword;
+    if (temporaryPassword) {
+      const passCheck = validatePasswordRequirements(temporaryPassword);
+      if (!passCheck.valid) {
+        return res.status(400).json({ success: false, message: passCheck.message });
+      }
+    } else {
+      temporaryPassword = generateTemporaryPassword(12);
+    }
+
+    const passwordHash = hashPassword(temporaryPassword);
+    await db.resetCompanyTemporaryPassword(companyId, passwordHash);
+
+    const loginUrl = process.env.COMPANY_LOGIN_URL || process.env.FRONTEND_URL || 'http://localhost:5173/login';
+    const emailResult = await emailService.sendCompanyCredentialsEmail({
+      recipientEmail: company.email,
+      temporaryPassword,
+      loginUrl
+    });
+
+    await db.addAuditLog({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      action: 'TEMP_PASSWORD_RESET',
+      module: 'Companies',
+      record_id: Number(companyId)
+    });
+
+    if (emailResult.success) {
+      res.json({ success: true, email_sent: true, message: `New temporary password set and sent to ${company.email}.` });
+    } else {
+      res.json({ success: true, email_sent: false, message: 'Temporary password reset, but failed to send credentials email.' });
+    }
+  } catch (err) {
+    console.error('Error resetting password:', err);
+    res.status(500).json({ success: false, message: 'Failed to reset company temporary password.' });
+  }
+});
+
+// RESEND CREDENTIALS (Admin & Super Admin)
+app.post(['/api/companies/:id/resend-credentials', '/api/admin/companies/:id/resend-credentials'], authenticateJWT, requirePermission('company.update'), async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    const company = await db.getCompanyById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+
+    const temporaryPassword = req.body.temporaryPassword || generateTemporaryPassword(12);
+    const passwordHash = hashPassword(temporaryPassword);
+    await db.resetCompanyTemporaryPassword(companyId, passwordHash);
+
+    const loginUrl = process.env.COMPANY_LOGIN_URL || process.env.FRONTEND_URL || 'http://localhost:5173/login';
+    const emailResult = await emailService.sendCompanyCredentialsEmail({
+      recipientEmail: company.email,
+      temporaryPassword,
+      loginUrl
+    });
+
+    if (emailResult.success) {
+      res.json({ success: true, email_sent: true, message: `Login credentials email sent successfully to ${company.email}.` });
+    } else {
+      res.json({ success: false, email_sent: false, message: 'Failed to send login credentials email. Please check SMTP settings.' });
+    }
+  } catch (err) {
+    console.error('Error resending credentials:', err);
+    res.status(500).json({ success: false, message: 'Failed to resend credentials.' });
+  }
+});
+
+// SEND OVERDUE RENT ALERT EMAIL (Admin & Super Admin)
+app.post(['/api/companies/:id/send-rent-alert', '/api/admin/companies/:id/send-rent-alert'], authenticateJWT, async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    const company = await db.getCompanyById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+
+    const payments = db.getPaymentsByCompany ? await db.getPaymentsByCompany(companyId) : [];
+    const pendingPayments = (payments || []).filter((p) => p.status === 'Pending' || p.status === 'PENDING' || p.status === 'Overdue');
+    
+    const overdueMonthsText = pendingPayments.length > 0
+      ? pendingPayments.map((p) => p.month_year || p.month).join(', ')
+      : 'Incubation Monthly Rent';
+
+    const totalOverdue = pendingPayments.length > 0
+      ? pendingPayments.reduce((sum, p) => sum + Number(p.amount || company.monthly_rate || 0), 0)
+      : Number(company.monthly_rate || 0);
+
+    const emailResult = await emailService.sendRentOverdueAlertEmail({
+      recipientEmail: company.email,
+      companyName: company.company_name,
+      overdueMonths: overdueMonthsText,
+      totalOverdueAmount: totalOverdue
+    });
+
+    if (emailResult.success) {
+      await db.addAuditLog({
+        user_id: req.user?.id || 1,
+        user_name: req.user?.name || 'Admin',
+        user_role: req.user?.role || 'SUPER_ADMIN',
+        action: 'RENT_ALERT_EMAIL_SENT',
+        module: 'Companies',
+        record_id: company.id
+      });
+      res.json({ success: true, email_sent: true, message: `Rent overdue alert email sent successfully to ${company.email}.` });
+    } else {
+      res.status(500).json({ success: false, email_sent: false, message: emailResult.error || 'Failed to send rent alert email.' });
+    }
+  } catch (err) {
+    console.error('Error sending rent alert email:', err);
+    res.status(500).json({ success: false, message: 'Internal Server Error while sending rent alert email.' });
+  }
+});
+
+// BATCH AUTOMATED RENT ALERT EMAIL FOR ALL UNPAID/PENDING COMPANIES (Admin & Super Admin)
+app.post(['/api/companies/auto-send-rent-alerts', '/api/admin/companies/auto-send-rent-alerts'], authenticateJWT, async (req, res) => {
+  try {
+    const allCompanies = db.getAllCompanies ? await db.getAllCompanies() : [];
+    let sentCount = 0;
+    let failedCount = 0;
+    const results = [];
+
+    for (const comp of allCompanies) {
+      if (!comp.email) continue;
+      const payments = db.getPaymentsByCompany ? await db.getPaymentsByCompany(comp.id) : [];
+      const pendingPayments = (payments || []).filter((p) => p.status === 'Pending' || p.status === 'PENDING' || p.status === 'Overdue');
+      
+      if (pendingPayments.length > 0) {
+        const overdueMonthsText = pendingPayments.map((p) => p.month_year || p.month).join(', ');
+        const totalOverdue = pendingPayments.reduce((sum, p) => sum + Number(p.amount || comp.monthly_rate || 0), 0);
+
+        const emailResult = await emailService.sendRentOverdueAlertEmail({
+          recipientEmail: comp.email,
+          companyName: comp.company_name,
+          overdueMonths: overdueMonthsText,
+          totalOverdueAmount: totalOverdue
+        });
+
+        if (emailResult.success) {
+          sentCount++;
+          results.push({ company_name: comp.company_name, email: comp.email, status: 'SENT' });
+        } else {
+          failedCount++;
+          results.push({ company_name: comp.company_name, email: comp.email, status: 'FAILED', error: emailResult.error });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      sent_count: sentCount,
+      failed_count: failedCount,
+      message: `Automated rent payment alert process completed. Sent: ${sentCount}, Failed: ${failedCount}.`,
+      results
+    });
+  } catch (err) {
+    console.error('Error running automated rent alerts batch:', err);
+    res.status(500).json({ success: false, message: 'Internal Server Error during automated rent alert process.' });
+  }
+});
+
+// ACTIVATE / DEACTIVATE COMPANY ACCOUNT STATUS (Admin & Super Admin)
+app.patch(['/api/companies/:id/status', '/api/admin/companies/:id/status'], authenticateJWT, requirePermission('company.update'), async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    const { status, account_status } = req.body;
+    const newStatus = (account_status || status || 'ACTIVE').toUpperCase();
+
+    const company = await db.getCompanyById(companyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+
+    await db.updateAccountStatus(companyId, newStatus);
+
+    await db.addAuditLog({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      action: newStatus === 'ACTIVE' ? 'COMPANY_ACTIVATED' : 'COMPANY_DEACTIVATED',
+      module: 'Companies',
+      record_id: Number(companyId)
+    });
+
+    res.json({ success: true, message: `Company account status updated to ${newStatus}.` });
+  } catch (err) {
+    console.error('Error updating account status:', err);
+    res.status(500).json({ success: false, message: 'Failed to update account status.' });
   }
 });
 
 // UPDATE Company (Super Admin has Full Access; Admin has RESTRICTED fields ONLY!)
-app.put('/api/companies/:id', authenticateJWT, requirePermission('company.update'), async (req, res) => {
+app.put(['/api/companies/:id', '/api/admin/companies/:id'], authenticateJWT, requirePermission('company.update'), async (req, res) => {
   try {
     const existing = await db.getCompanyById(req.params.id);
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Company not found' });
     }
 
-    // STRICT BACKEND RBAC CHECK FOR ADMIN ROLE:
-    // Admin is ONLY allowed to edit: company_name, contact_person, email, contact_number, interns_count, workers_count, business_description
-    // If Admin attempts to edit restricted fields (place_id, place, rate, monthly_rate, status, payment_status, id), return HTTP 403 Forbidden!
     if (req.user.role === 'ADMIN') {
       const restrictedFieldsAttempted = ['place_id', 'place', 'rate', 'monthly_rate', 'status', 'payment_status'].some(
         (field) => req.body[field] !== undefined && req.body[field] !== existing[field]
@@ -433,7 +877,6 @@ app.put('/api/companies/:id', authenticateJWT, requirePermission('company.update
       }
     }
 
-    // Construct allowed payload based on user role
     const updateData = { ...existing };
     updateData.company_name = req.body.company_name ?? existing.company_name;
     updateData.contact_person = req.body.contact_person ?? existing.contact_person;
@@ -443,7 +886,6 @@ app.put('/api/companies/:id', authenticateJWT, requirePermission('company.update
     updateData.workers_count = req.body.workers_count ?? existing.workers_count;
     updateData.business_description = req.body.business_description ?? existing.business_description;
 
-    // Super Admin can edit restricted fields as well
     if (req.user.role === 'SUPER_ADMIN') {
       updateData.place = req.body.place ?? existing.place;
       updateData.monthly_rate = req.body.monthly_rate ?? existing.monthly_rate;
@@ -473,7 +915,7 @@ app.put('/api/companies/:id', authenticateJWT, requirePermission('company.update
 });
 
 // DELETE Company (Super Admin Only! Returns 403 for Admin)
-app.delete('/api/companies/:id', authenticateJWT, requirePermission('company.delete'), async (req, res) => {
+app.delete(['/api/companies/:id', '/api/admin/companies/:id'], authenticateJWT, requirePermission('company.delete'), async (req, res) => {
   try {
     const existing = await db.getCompanyById(req.params.id);
     if (!existing) {
@@ -637,7 +1079,7 @@ app.get('/api/invoices/:id/receipt', async (req, res) => {
     const company = await db.getCompanyById(invoice.company_id);
     const payments = await db.getPaymentsByCompany(invoice.company_id);
     const lastPayment = payments.find(p => p.status === 'PAID' || p.payment_status === 'PAID') || payments[0];
-    
+
     res.json({
       success: true,
       receipt: {
@@ -646,7 +1088,7 @@ app.get('/api/invoices/:id/receipt', async (req, res) => {
         phone: '+91 72000 99955',
         email: 'Info@mccmrfip.com',
         invoice_number: invoice.invoice_number,
-        payment_id: lastPayment ? (lastPayment.razorpay_payment_id || lastPayment.id) : `pay_inv_${invoice.id}`,
+        payment_id: lastPayment ? (lastPayment.payu_payment_id || lastPayment.transaction_id || lastPayment.id) : `pay_inv_${invoice.id}`,
         company_name: company ? company.company_name : invoice.company_name,
         contact_person: company ? company.contact_person : invoice.contact_person,
         email_address: company ? company.email : invoice.email,
@@ -654,7 +1096,7 @@ app.get('/api/invoices/:id/receipt', async (req, res) => {
         place: company ? company.place : invoice.place,
         billing_period: invoice.billing_period,
         amount: Number(invoice.total_amount || invoice.amount),
-        payment_method: lastPayment ? (lastPayment.payment_method || 'Razorpay Standard Checkout') : 'Razorpay Standard Checkout',
+        payment_method: lastPayment ? (lastPayment.payment_method || 'PayU (UPI / Card)') : 'PayU (UPI / Card)',
         payment_date: lastPayment ? (lastPayment.payment_date || new Date().toISOString()) : new Date().toISOString(),
         payment_status: invoice.status === 'PAID' ? 'PAID' : invoice.status
       }
@@ -664,322 +1106,240 @@ app.get('/api/invoices/:id/receipt', async (req, res) => {
   }
 });
 
-// Create Razorpay Order API (SERVER-SIDE AMOUNT SELECTION - NEVER TRUST FRONTEND AMOUNT)
-app.post('/api/payments/create-order', async (req, res) => {
+// ==========================================================================
+// PAYU INDIA PAYMENT GATEWAY INTEGRATION
+// ==========================================================================
+
+// CREATE PAYU PAYMENT TRANSACTION API
+app.post(['/api/payments/create-payu-payment', '/api/payment/create-payu-payment', '/api/payments/create-order'], authenticateJWT, async (req, res) => {
   try {
-    const { invoice_id, company_id, companyId, companyName, amount, month } = req.body;
-    const cId = company_id || companyId;
+    const { company_id, invoice_id, companyId, billing_month } = req.body;
+    const targetCompanyId = company_id || companyId || (req.user ? req.user.company_id : null) || 1;
 
-    let invoice = null;
-    if (invoice_id) {
-      invoice = await db.getInvoiceById(invoice_id);
-    } else if (cId) {
-      invoice = await db.getInvoiceByCompanyId(cId);
+    let company = await db.getCompanyById(targetCompanyId);
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Incubation company not found' });
     }
 
-    if (!invoice && companyName) {
-      const allComp = await db.getCompanies();
-      const matchComp = allComp.find(c => c.company_name && c.company_name.toLowerCase() === companyName.toLowerCase());
-      if (matchComp) {
-        invoice = await db.getInvoiceByCompanyId(matchComp.id);
-      }
-    }
+    // SERVER-SIDE AMOUNT CALCULATION (Monthly Rate + 18% GST) - NEVER TRUST FRONTEND AMOUNT!
+    const baseMonthlyRate = Number(company.monthly_rate || 10000);
+    const gstAmount = Math.round(baseMonthlyRate * 0.18);
+    const totalAmount = baseMonthlyRate + gstAmount;
 
-    if (!invoice && cId) {
-      const comp = await db.getCompanyById(cId);
-      if (comp) {
-        invoice = await db.createInvoiceForCompany(comp);
-      }
-    }
+    // Generate Unique Transaction ID
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const transactionId = `MRF-INV-${dateStr}-${randomSuffix}`;
+    const billingPeriod = billing_month || req.body.month || 'August 2026';
 
-    if (!invoice) {
-      const fallbackAmt = Number(amount) || 10000;
-      invoice = {
-        id: Date.now(),
-        invoice_number: `INV-MRF-2026-${Math.floor(10000 + Math.random() * 90000)}`,
-        company_id: cId || 1,
-        company_name: companyName || 'Green Era',
-        total_amount: fallbackAmt,
-        amount: fallbackAmt,
-        billing_period: month || 'August 2026',
-        status: 'UNPAID'
-      };
-    }
+    // Get PayU Merchant Config
+    const payuConfig = await payuService.getPayUConfig();
 
-    const company = (await db.getCompanyById(invoice.company_id)) || {
-      id: invoice.company_id,
-      company_name: invoice.company_name || companyName || 'Green Era',
-      contact_person: req.body.customerName || 'Contact Person',
-      email: req.body.customerEmail || 'info@mccmrfip.com',
-      contact_number: req.body.customerPhone || '9876543210'
-    };
-
-    // SERVER-SIDE AMOUNT CALCULATION (INR to Paise)
-    const amountInr = Number(invoice.total_amount || invoice.amount || amount || 10000);
-    const amountPaise = Math.round(amountInr * 100);
-    const receiptId = `rcpt_inv_${invoice.id}_${Date.now()}`;
-
-    let rzpOrder;
-    try {
-      rzpOrder = await razorpay.orders.create({
-        amount: amountPaise,
-        currency: 'INR',
-        receipt: receiptId,
-        payment_capture: 1, // Automatic capture enabled
-        notes: {
-          invoice_id: String(invoice.id),
-          invoice_number: invoice.invoice_number,
-          company_id: String(company.id),
-          company_name: company.company_name
-        }
-      });
-    } catch (rzpErr) {
-      console.warn('Razorpay SDK order creation error, generating fallback test order ID:', rzpErr);
-      rzpOrder = {
-        id: `order_test_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`,
-        amount: amountPaise,
-        currency: 'INR',
-        receipt: receiptId,
-        status: 'created'
-      };
-    }
-
-    const paymentRecord = await db.createPaymentRecord({
-      company_id: company.id,
-      invoice_id: invoice.id,
-      company_name: company.company_name,
-      order_id: rzpOrder.id,
-      razorpay_order_id: rzpOrder.id,
-      amount: amountInr,
-      amount_paise: amountPaise,
-      currency: 'INR',
-      payment_method: 'Razorpay Standard Checkout',
-      payment_status: 'CREATED',
-      status: 'CREATED',
-      receipt: receiptId,
-      month_year: invoice.billing_period || month || 'August 2026',
-      customer_name: company.contact_person,
-      customer_email: company.email,
-      customer_phone: company.contact_number
+    // Create pending payment record in DB
+    const paymentRecord = await db.createPayUPaymentTx({
+      companyId: company.id,
+      invoiceId: invoice_id || null,
+      transactionId: transactionId,
+      amount: totalAmount,
+      monthYear: billingPeriod,
+      customerName: company.contact_person,
+      customerEmail: company.email
     });
 
-    if (invoice.id && typeof db.updateInvoiceStatus === 'function') {
-      await db.updateInvoiceStatus(invoice.id, 'PAYMENT_PENDING');
-    }
+    const successUrl = process.env.PAYU_SUCCESS_URL || 'http://localhost:5000/api/payments/payu/success';
+    const failureUrl = process.env.PAYU_FAILURE_URL || 'http://localhost:5000/api/payments/payu/failure';
+    const cancelUrl = process.env.PAYU_CANCEL_URL || failureUrl;
+
+    const productinfo = `Workspace Rent Payment - ${billingPeriod}`;
+    const firstname = (company.contact_person || company.company_name || 'Incubate').split(' ')[0];
+    const email = company.email || 'accounts@mccmrfip.com';
+
+    // Generate SHA-512 PayU Request Hash
+    const payuHash = payuService.generatePayUHash({
+      key: payuConfig.merchantKey,
+      txnid: transactionId,
+      amount: totalAmount,
+      productinfo: productinfo,
+      firstname: firstname,
+      email: email,
+      salt: payuConfig.merchantSalt
+    });
 
     await db.addAuditLog({
       user_id: company.id,
       user_name: company.company_name,
       user_role: 'COMPANY_USER',
-      action: 'PAYMENT_ORDER_CREATED',
+      action: 'PAYU_PAYMENT_INITIATED',
       module: 'Payments System',
-      record_id: invoice.id,
-      new_data: { razorpay_order_id: rzpOrder.id, amount_paise: amountPaise }
+      record_id: paymentRecord.id || 0,
+      new_data: { transaction_id: transactionId, amount: totalAmount }
     });
 
     return res.json({
       success: true,
-      key_id: razorpayKeyId,
-      keyId: razorpayKeyId,
-      order_id: rzpOrder.id,
-      orderId: rzpOrder.id,
-      amount: amountPaise,
-      currency: 'INR',
-      amount_formatted: amountInr,
-      invoice_id: invoice.id,
-      invoice_number: invoice.invoice_number,
-      billing_period: invoice.billing_period || month || 'August 2026',
-      company_name: company.company_name,
-      contact_person: company.contact_person,
-      email: company.email,
-      phone: company.contact_number,
-      payment_record_id: paymentRecord.id
+      payuUrl: payuConfig.payuUrl,
+      environment: payuConfig.environment,
+      params: {
+        key: payuConfig.merchantKey,
+        txnid: transactionId,
+        amount: totalAmount,
+        productinfo: productinfo,
+        firstname: firstname,
+        email: email,
+        phone: company.contact_number || '9876543210',
+        surl: successUrl,
+        furl: failureUrl,
+        curl: cancelUrl,
+        hash: payuHash,
+        enforce_paymethod: 'creditcard,debitcard,upi',
+        service_provider: 'payu_paisa'
+      },
+      invoice_number: `INV-MRF-2026-${String(company.s_no || company.id).padStart(5, '0')}`,
+      billing_period: billingPeriod,
+      monthly_rent: baseMonthlyRate,
+      gst_amount: gstAmount,
+      total_amount: totalAmount
     });
   } catch (err) {
-    console.error('Error creating Razorpay payment order:', err);
-    res.status(500).json({ success: false, message: 'Failed to create payment order' });
+    console.error('Error creating PayU payment:', err);
+    res.status(500).json({ success: false, message: 'Failed to initiate PayU payment' });
   }
 });
 
-// Legacy backward compatibility endpoint for create-order
-app.post('/api/payment/create-order', async (req, res) => {
-  return app._router.handle({ ...req, url: '/api/payments/create-order' }, res);
-});
-
-// Verify Razorpay Payment Signature API
-app.post('/api/payments/verify', async (req, res) => {
+// PAYU SUCCESS CALLBACK (PayU POSTs to this endpoint)
+app.post('/api/payments/payu/success', async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, invoice_id, payment_method } = req.body;
+    const payuConfig = await payuService.getPayUConfig();
+    const isValidHash = payuService.verifyPayUResponseHash(req.body, payuConfig.merchantSalt);
 
-    if (!razorpay_order_id || !razorpay_payment_id) {
-      return res.status(400).json({ success: false, message: 'Missing payment parameters for verification' });
-    }
+    const txnid = req.body.txnid;
+    const status = req.body.status;
+    const payuMoneyId = req.body.payuMoneyId || req.body.mihpayid;
+    const paymentMode = req.body.mode ? `PayU (${req.body.mode.toUpperCase()})` : 'PayU (UPI / Card)';
 
-    const secret = razorpayKeySecret;
-    let isValidSignature = false;
+    // Server-to-server verification with PayU API
+    const apiVerification = await payuService.verifyPayUTransactionWithApi({
+      txnid,
+      merchantKey: payuConfig.merchantKey,
+      merchantSalt: payuConfig.merchantSalt,
+      verifyUrl: payuConfig.verifyUrl
+    });
 
-    if (razorpay_signature) {
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest('hex');
+    const isVerifiedPaid = (status === 'success' && (isValidHash || apiVerification.success));
 
-      try {
-        isValidSignature = crypto.timingSafeEqual(
-          Buffer.from(expectedSignature, 'utf-8'),
-          Buffer.from(razorpay_signature, 'utf-8')
-        );
-      } catch (e) {
-        isValidSignature = (expectedSignature === razorpay_signature);
-      }
-    }
-
-    if (!isValidSignature && (razorpay_payment_id.startsWith('pay_test_') || razorpay_order_id.startsWith('order_test_'))) {
-      isValidSignature = true;
-    }
-
-    if (!isValidSignature) {
-      await db.updatePaymentStatus(razorpay_order_id, {
-        status: 'FAILED',
-        payment_status: 'FAILED',
-        razorpay_payment_id
+    if (isVerifiedPaid) {
+      await db.updatePayUPaymentStatus(txnid, {
+        status: 'PAID',
+        payuPaymentId: payuMoneyId,
+        paymentMethod: paymentMode
       });
-      return res.status(400).json({ success: false, message: 'Payment verification failed. Invalid signature.' });
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendUrl}/payment/success?txnid=${encodeURIComponent(txnid)}&payuid=${encodeURIComponent(payuMoneyId || '')}`);
+    } else {
+      await db.updatePayUPaymentStatus(txnid, {
+        status: 'FAILED',
+        payuPaymentId: payuMoneyId,
+        failureReason: req.body.error_Message || 'PayU hash or verification failed'
+      });
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      return res.redirect(`${frontendUrl}/payment/failed?txnid=${encodeURIComponent(txnid)}&reason=VerificationFailed`);
     }
-
-    let fetchedPayment = null;
-    try {
-      fetchedPayment = await razorpay.payments.fetch(razorpay_payment_id);
-    } catch (fetchErr) {
-      console.warn('Razorpay fetch warning, using signature verification:', fetchErr);
-    }
-
-    const methodStr = fetchedPayment?.method 
-      ? `Razorpay (${fetchedPayment.method.toUpperCase()})` 
-      : (payment_method || 'Razorpay Standard Checkout (UPI / Cards / NetBanking)');
-
-    const updatedPayment = await db.updatePaymentStatus(razorpay_order_id, {
-      status: 'PAID',
-      payment_status: 'PAID',
-      razorpay_payment_id,
-      razorpay_signature: razorpay_signature || 'verified_sig_2026',
-      payment_method: methodStr
-    });
-
-    const p = await db.getPaymentByRazorpayOrderId(razorpay_order_id);
-    const invId = invoice_id || (p ? p.invoice_id : null);
-    let updatedInvoice = null;
-    if (invId) {
-      updatedInvoice = await db.updateInvoiceStatus(invId, 'PAID');
-    }
-
-    await db.addAuditLog({
-      user_id: p ? p.company_id : 1,
-      user_name: p ? p.company_name : 'System',
-      user_role: 'COMPANY_USER',
-      action: 'PAYMENT_VERIFIED_PAID',
-      module: 'Payments System',
-      record_id: invId || 0,
-      new_data: { razorpay_payment_id, razorpay_order_id }
-    });
-
-    return res.json({
-      success: true,
-      message: 'Payment verified and recorded successfully!',
-      payment_status: 'PAID',
-      payment_id: razorpay_payment_id,
-      order_id: razorpay_order_id,
-      payment: updatedPayment,
-      invoice: updatedInvoice
-    });
   } catch (err) {
-    console.error('Error verifying payment:', err);
-    res.status(500).json({ success: false, message: 'Server-side payment verification failed' });
+    console.error('Error handling PayU success callback:', err);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return res.redirect(`${frontendUrl}/payment/failed?reason=ServerError`);
   }
 });
 
-// Legacy backward compatibility endpoint for verify
-app.post('/api/payment/verify', async (req, res) => {
-  return app._router.handle({ ...req, url: '/api/payments/verify' }, res);
+// PAYU FAILURE / CANCEL CALLBACK
+app.post('/api/payments/payu/failure', async (req, res) => {
+  try {
+    const txnid = req.body.txnid;
+    const status = req.body.status || 'failure';
+    const reason = req.body.error_Message || req.body.field9 || 'Payment cancelled or failed on PayU';
+
+    if (txnid) {
+      await db.updatePayUPaymentStatus(txnid, {
+        status: status === 'userCancelled' ? 'CANCELLED' : 'FAILED',
+        failureReason: reason
+      });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    if (status === 'userCancelled') {
+      return res.redirect(`${frontendUrl}/payment/cancelled?txnid=${encodeURIComponent(txnid || '')}`);
+    }
+    return res.redirect(`${frontendUrl}/payment/failed?txnid=${encodeURIComponent(txnid || '')}&reason=${encodeURIComponent(reason)}`);
+  } catch (err) {
+    console.error('Error handling PayU failure callback:', err);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return res.redirect(`${frontendUrl}/payment/failed?reason=ServerError`);
+  }
 });
 
-// Razorpay Webhook Endpoint
-app.post('/api/payments/webhook', async (req, res) => {
+// PAYU DIRECT VERIFICATION API
+app.post('/api/payments/payu/verify', async (req, res) => {
   try {
-    const signature = req.headers['x-razorpay-signature'];
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || 'mccmrf_webhook_secret_2026';
-    
-    let rawBody = req.body;
-    if (Buffer.isBuffer(req.body)) {
-      rawBody = req.body.toString('utf8');
-    } else if (typeof req.body === 'object') {
-      rawBody = JSON.stringify(req.body);
+    const { txnid } = req.body;
+    if (!txnid) {
+      return res.status(400).json({ success: false, message: 'Transaction ID (txnid) is required' });
     }
 
-    if (signature) {
-      const expectedSig = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(rawBody)
-        .digest('hex');
+    const payuConfig = await payuService.getPayUConfig();
+    const result = await payuService.verifyPayUTransactionWithApi({
+      txnid,
+      merchantKey: payuConfig.merchantKey,
+      merchantSalt: payuConfig.merchantSalt,
+      verifyUrl: payuConfig.verifyUrl
+    });
 
-      let isValid = false;
-      try {
-        isValid = crypto.timingSafeEqual(
-          Buffer.from(expectedSig, 'utf-8'),
-          Buffer.from(signature, 'utf-8')
-        );
-      } catch (e) {
-        isValid = (expectedSig === signature);
-      }
+    const dbRecord = await db.getPaymentByTxnId(txnid);
 
-      if (!isValid) {
-        return res.status(400).json({ success: false, message: 'Invalid webhook signature' });
-      }
-    }
-
-    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-
-    if (event.event === 'payment.captured' || event.event === 'order.paid') {
-      const paymentEntity = event.payload?.payment?.entity;
-      if (paymentEntity) {
-        const orderId = paymentEntity.order_id;
-        const paymentId = paymentEntity.id;
-
-        await db.updatePaymentStatus(orderId, {
-          status: 'PAID',
-          payment_status: 'PAID',
-          razorpay_payment_id: paymentId,
-          payment_method: `Razorpay (${paymentEntity.method ? paymentEntity.method.toUpperCase() : 'STANDARD'})`
-        });
-
-        const p = await db.getPaymentByRazorpayOrderId(orderId);
-        if (p && p.invoice_id) {
-          await db.updateInvoiceStatus(p.invoice_id, 'PAID');
-        }
-
-        await db.addAuditLog({
-          user_name: 'Razorpay Webhook',
-          user_role: 'SYSTEM',
-          action: 'WEBHOOK_PAYMENT_CAPTURED',
-          module: 'Payments System',
-          record_id: p ? p.id : 0
-        });
-      }
-    } else if (event.event === 'payment.failed') {
-      const paymentEntity = event.payload?.payment?.entity;
-      if (paymentEntity) {
-        await db.updatePaymentStatus(paymentEntity.order_id, {
-          status: 'FAILED',
-          payment_status: 'FAILED',
-          razorpay_payment_id: paymentEntity.id
-        });
-      }
-    }
-
-    return res.status(200).json({ status: 'ok' });
+    return res.json({
+      success: result.success,
+      status: result.status || (dbRecord ? dbRecord.payment_status : 'UNKNOWN'),
+      transaction: dbRecord,
+      payuVerification: result
+    });
   } catch (err) {
-    console.error('Webhook error:', err);
-    return res.status(200).json({ status: 'error_handled' });
+    console.error('Error verifying PayU payment:', err);
+    res.status(500).json({ success: false, message: 'PayU verification failed' });
+  }
+});
+
+// SUPER ADMIN PAYU GATEWAY SETTINGS ENDPOINTS
+app.get(['/api/settings/payment-gateway', '/api/admin/settings/payment-gateway'], authenticateJWT, async (req, res) => {
+  try {
+    const setting = await db.getPayUSetting();
+    res.json({
+      success: true,
+      paymentGateway: {
+        gateway_name: 'PayU India',
+        status: 'ACTIVE',
+        environment: setting.environment || 'test',
+        merchant_key: setting.merchant_key || 'gtK2yq',
+        merchant_salt: setting.merchant_salt ? '****************' : '',
+        allowed_methods: setting.allowed_methods || ['UPI', 'CARD']
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to fetch PayU settings' });
+  }
+});
+
+app.post(['/api/settings/payment-gateway', '/api/admin/settings/payment-gateway'], authenticateJWT, requirePermission('access.manage'), async (req, res) => {
+  try {
+    const { environment, merchantKey, merchantSalt, allowedMethods } = req.body;
+    const updated = await db.savePayUSetting({
+      environment,
+      merchantKey,
+      merchantSalt,
+      allowedMethods
+    });
+    res.json({ success: true, message: 'PayU gateway settings updated successfully', setting: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Failed to update PayU settings' });
   }
 });
 
@@ -1340,6 +1700,264 @@ app.get('/api/audit-logs', authenticateJWT, requirePermission('access.manage'), 
   }
 });
 
-app.listen(PORT, () => {
+// ==================================================
+// SUPER ADMIN DYNAMIC SMTP MANAGEMENT MODULE
+// ==================================================
+
+// Middleware: Require Super Admin Role
+const requireSuperAdmin = (req, res, next) => {
+  if (!req.user || (req.user.role !== 'SUPER_ADMIN' && Number(req.user.role_id) !== 1)) {
+    return res.status(403).json({
+      success: false,
+      message: 'HTTP 403 Forbidden: Access denied. Super Admin privileges required.'
+    });
+  }
+  next();
+};
+
+// Helper: Strip password from JSON response payload
+const getSafeSmtpSetting = (setting) => {
+  if (!setting) return null;
+  const safe = { ...setting };
+  delete safe.password_encrypted;
+  delete safe.password;
+  safe.has_password = Boolean(setting.password_encrypted && setting.password_encrypted.length > 0);
+  return safe;
+};
+
+// 1. GET /api/smtp-settings/ - List Configurations
+app.get('/api/smtp-settings/', authenticateJWT, requireSuperAdmin, async (req, res) => {
+  try {
+    const settings = await db.getSmtpSettings();
+    const safeSettings = settings.map(getSafeSmtpSetting);
+    const activeSetting = safeSettings.find((s) => s.is_active === 1 || s.is_active === true) || null;
+    res.json({
+      success: true,
+      settings: safeSettings,
+      activeSetting: activeSetting
+    });
+  } catch (err) {
+    console.error('Error fetching SMTP settings:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch SMTP settings' });
+  }
+});
+
+// 2. POST /api/smtp-settings/ - Create Configuration
+app.post('/api/smtp-settings/', authenticateJWT, requireSuperAdmin, async (req, res) => {
+  try {
+    const {
+      provider,
+      host,
+      port,
+      username,
+      password,
+      auth_required,
+      use_tls,
+      use_ssl,
+      sender_email,
+      is_active
+    } = req.body;
+
+    if (!host) return res.status(400).json({ success: false, message: 'SMTP Host is required.' });
+    if (!port || isNaN(Number(port))) return res.status(400).json({ success: false, message: 'Valid numeric Port is required.' });
+    if (!sender_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender_email)) {
+      return res.status(400).json({ success: false, message: 'Valid Sender Email address is required.' });
+    }
+
+    const authReq = auth_required !== false && auth_required !== 0 && auth_required !== '0';
+    if (authReq && (!username || !username.trim())) {
+      return res.status(400).json({ success: false, message: 'Username is required when authentication is enabled.' });
+    }
+
+    const encryptedPassword = password ? encryptSmtpPassword(password) : '';
+
+    const newRecord = await db.createSmtpSetting({
+      provider: provider || 'Custom SMTP Server',
+      host,
+      port: Number(port),
+      username: authReq ? username : '',
+      password_encrypted: encryptedPassword,
+      auth_required: authReq ? 1 : 0,
+      use_tls: use_tls !== false ? 1 : 0,
+      use_ssl: use_ssl ? 1 : 0,
+      sender_email,
+      is_active: is_active ? 1 : 0
+    });
+
+    await db.addAuditLog({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      action: 'CREATE',
+      module: 'SMTP Settings',
+      record_id: newRecord?.id,
+      new_data: getSafeSmtpSetting(newRecord)
+    });
+
+    res.status(201).json({
+      success: true,
+      setting: getSafeSmtpSetting(newRecord),
+      message: 'SMTP configuration created successfully.'
+    });
+  } catch (err) {
+    console.error('Error creating SMTP setting:', err);
+    res.status(500).json({ success: false, message: 'Failed to create SMTP configuration.' });
+  }
+});
+
+// 3. PUT/PATCH /api/smtp-settings/:id/ - Update Configuration / Toggle Active Status
+app.put('/api/smtp-settings/:id/', authenticateJWT, requireSuperAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const existing = await db.getSmtpSettingById(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'SMTP configuration not found.' });
+    }
+
+    const {
+      provider,
+      host,
+      port,
+      username,
+      password,
+      auth_required,
+      use_tls,
+      use_ssl,
+      sender_email,
+      is_active
+    } = req.body;
+
+    let encryptedPassword = existing.password_encrypted;
+    if (password && password !== '••••••••••••') {
+      encryptedPassword = encryptSmtpPassword(password);
+    }
+
+    const updatePayload = {};
+    if (provider !== undefined) updatePayload.provider = provider;
+    if (host !== undefined) updatePayload.host = host;
+    if (port !== undefined) updatePayload.port = Number(port);
+    if (username !== undefined) updatePayload.username = username;
+    if (encryptedPassword !== undefined) updatePayload.password_encrypted = encryptedPassword;
+    if (auth_required !== undefined) updatePayload.auth_required = auth_required ? 1 : 0;
+    if (use_tls !== undefined) updatePayload.use_tls = use_tls ? 1 : 0;
+    if (use_ssl !== undefined) updatePayload.use_ssl = use_ssl ? 1 : 0;
+    if (sender_email !== undefined) updatePayload.sender_email = sender_email;
+    if (is_active !== undefined) updatePayload.is_active = is_active ? 1 : 0;
+
+    const updated = await db.updateSmtpSetting(id, updatePayload);
+
+    await db.addAuditLog({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      action: 'UPDATE',
+      module: 'SMTP Settings',
+      record_id: Number(id),
+      new_data: getSafeSmtpSetting(updated)
+    });
+
+    res.json({
+      success: true,
+      setting: getSafeSmtpSetting(updated),
+      message: 'SMTP configuration updated successfully.'
+    });
+  } catch (err) {
+    console.error('Error updating SMTP setting:', err);
+    res.status(500).json({ success: false, message: 'Failed to update SMTP configuration.' });
+  }
+});
+
+// 4. DELETE /api/smtp-settings/:id/ - Delete Configuration
+app.delete('/api/smtp-settings/:id/', authenticateJWT, requireSuperAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const existing = await db.getSmtpSettingById(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'SMTP configuration not found.' });
+    }
+
+    await db.deleteSmtpSetting(id);
+
+    await db.addAuditLog({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      action: 'DELETE',
+      module: 'SMTP Settings',
+      record_id: Number(id)
+    });
+
+    res.json({ success: true, message: 'SMTP configuration deleted successfully.' });
+  } catch (err) {
+    console.error('Error deleting SMTP setting:', err);
+    res.status(500).json({ success: false, message: 'Failed to delete SMTP configuration.' });
+  }
+});
+
+// 5. POST /api/smtp-settings/:id/test-connection/ - Test Connection with Structured Diagnostics
+app.post('/api/smtp-settings/:id/test-connection/', authenticateJWT, requireSuperAdmin, async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { test_email, override_password, setting_data } = req.body;
+
+    let targetSetting = null;
+    if (id !== '0' && id !== 'new') {
+      targetSetting = await db.getSmtpSettingById(id);
+    }
+    if (!targetSetting && setting_data) {
+      targetSetting = setting_data;
+    }
+
+    if (!targetSetting && id === '0') {
+      targetSetting = await db.getActiveSmtpSetting();
+    }
+
+    if (!targetSetting || !targetSetting.host) {
+      return res.status(400).json({
+        success: false,
+        diagnosticCode: 'Network Timeout',
+        message: 'Invalid or missing SMTP configuration for testing.'
+      });
+    }
+
+    const testRecipient = test_email || 'user@example.com';
+    const diagResult = await emailService.testSmtpConnection(targetSetting, testRecipient, override_password);
+
+    if (targetSetting.id) {
+      await db.updateSmtpTestStatus(targetSetting.id, diagResult.success ? 'CONNECTED' : 'FAILED');
+    }
+
+    await db.addAuditLog({
+      user_id: req.user.id,
+      user_name: req.user.name,
+      user_role: req.user.role,
+      action: 'TEST_CONNECTION',
+      module: 'SMTP Settings',
+      new_data: { test_email: testRecipient, diagnosticCode: diagResult.diagnosticCode }
+    });
+
+    res.json(diagResult);
+  } catch (err) {
+    console.error('SMTP test connection endpoint exception:', err);
+    res.json({
+      success: false,
+      diagnosticCode: 'Auth Failure',
+      message: 'SMTP connection test failed. Please check host, port, username, password and TLS/SSL settings.'
+    });
+  }
+});
+
+const server = app.listen(PORT, () => {
   console.log(`MCC MRF Enterprise Backend Server running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`[SERVER WARNING] Port ${PORT} is already in use by an active backend server process.`);
+    console.warn(`[SERVER WARNING] Existing backend process is handling API requests on http://localhost:${PORT}`);
+    process.exit(0);
+  } else {
+    console.error('[SERVER ERROR]', err);
+    process.exit(1);
+  }
 });

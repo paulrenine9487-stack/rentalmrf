@@ -11,7 +11,7 @@ const PRESEEDED_COMPANIES = [
     company_name: 'Green Era',
     contact_number: '9361328432',
     email: 'accounts@thegreenera.in',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 1,
     monthly_rate: 10000,
@@ -27,7 +27,7 @@ const PRESEEDED_COMPANIES = [
     company_name: 'TMS',
     contact_number: '9876543211',
     email: 'jeevasenthil103@gmail.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 2,
     workers_count: 3,
     monthly_rate: 15000,
@@ -43,7 +43,7 @@ const PRESEEDED_COMPANIES = [
     company_name: 'LexPOSH LLP',
     contact_number: '9876543212',
     email: 'contact@lexposh.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 2,
     monthly_rate: 12000,
@@ -59,7 +59,7 @@ const PRESEEDED_COMPANIES = [
     company_name: 'I View Sence',
     contact_number: '9876543213',
     email: 'kannan@iviewsense.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 1,
     workers_count: 1,
     monthly_rate: 3000,
@@ -75,7 +75,7 @@ const PRESEEDED_COMPANIES = [
     company_name: 'CLOUDELU LABS',
     contact_number: '9876543214',
     email: 'vivek@cloudelu.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 2,
     workers_count: 2,
     monthly_rate: 12000,
@@ -91,7 +91,7 @@ const PRESEEDED_COMPANIES = [
     company_name: 'demo',
     contact_number: '9876543218',
     email: 'demo@gmail.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 0,
     monthly_rate: 0,
@@ -139,7 +139,7 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/user/login', {
+      const res = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword })
@@ -148,8 +148,24 @@ export default function Login() {
       const data = await res.json();
       setLoading(false);
 
-      if (data.success && data.company) {
-        localStorage.setItem('currentCompany', JSON.stringify(data.company));
+      if (data.success) {
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('companyToken', data.token);
+        }
+        if (data.user) {
+          localStorage.setItem('currentUser', JSON.stringify(data.user));
+        }
+        if (data.company) {
+          localStorage.setItem('currentCompany', JSON.stringify(data.company));
+        }
+
+        // If backend flags temporary password requirement, force redirect to /change-password
+        if (data.requiresPasswordChange) {
+          navigate('/change-password');
+          return;
+        }
+
         navigate('/dashboard');
         return;
       } else {
@@ -188,7 +204,7 @@ export default function Login() {
           company_name: loginEmail.split('@')[0] || 'Incubated Company',
           contact_number: '9361328432',
           email: loginEmail,
-          password: 'mccmrfip123',
+          password: 'Mccmrfip@2025',
           interns_count: 0,
           workers_count: 1,
           monthly_rate: 10000,
@@ -201,7 +217,7 @@ export default function Login() {
 
       const passMap = JSON.parse(localStorage.getItem('company_passwords_map') || '{}');
       const customPassword = passMap[loginEmail.toLowerCase()];
-      const expectedPassword = customPassword || matchedCompany.password || 'mccmrfip123';
+      const expectedPassword = customPassword || matchedCompany.password || 'Mccmrfip@2025';
 
       if (loginPassword === expectedPassword) {
         const finalCompany = { ...matchedCompany, password: expectedPassword };

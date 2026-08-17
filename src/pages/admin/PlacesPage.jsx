@@ -168,25 +168,23 @@ export default function PlacesPage() {
           />
         </div>
 
-        {isSuperAdmin && (
-          <button
-            className="admin-btn admin-btn-primary"
-            onClick={() => {
-              setFormData({
-                name: '',
-                description: '',
-                capacity: 1,
-                monthly_rate: 10000,
-                status: 'Available'
-              });
-              setAlertMsg({ type: '', text: '' });
-              setShowAddModal(true);
-            }}
-          >
-            <Plus size={18} />
-            <span>Add Place</span>
-          </button>
-        )}
+        <button
+          className="admin-btn admin-btn-primary"
+          onClick={() => {
+            setFormData({
+              name: '',
+              description: '',
+              capacity: 1,
+              monthly_rate: 10000,
+              status: 'Available'
+            });
+            setAlertMsg({ type: '', text: '' });
+            setShowAddModal(true);
+          }}
+        >
+          <Plus size={18} />
+          <span>Add Place</span>
+        </button>
       </div>
 
       <div className="admin-table-wrapper">

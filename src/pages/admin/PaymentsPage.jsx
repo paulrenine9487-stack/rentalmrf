@@ -118,8 +118,9 @@ export default function PaymentsPage() {
     const matchesSearch =
       !searchTerm ||
       (p.company_name && p.company_name.toLowerCase().includes(q)) ||
-      (p.razorpay_payment_id && p.razorpay_payment_id.toLowerCase().includes(q)) ||
-      (p.razorpay_order_id && p.razorpay_order_id.toLowerCase().includes(q));
+      (p.payu_payment_id && p.payu_payment_id.toLowerCase().includes(q)) ||
+      (p.payu_transaction_id && p.payu_transaction_id.toLowerCase().includes(q)) ||
+      (p.transaction_id && p.transaction_id.toLowerCase().includes(q));
 
     const matchesStatus =
       statusFilter === 'All' ||
@@ -137,7 +138,7 @@ export default function PaymentsPage() {
   return (
     <AdminLayout
       title="Payments Management"
-      subtitle="Track rental payments, Razorpay transactions, and financial status."
+      subtitle="Track rental payments, PayU transactions, and financial status."
     >
       {/* 1. TOP FINANCIAL STATISTICS CARDS */}
       <div className="admin-stats-grid">
@@ -229,9 +230,9 @@ export default function PaymentsPage() {
             }}
           >
             <option value="All">All Payment Methods</option>
-            <option value="Razorpay">Razorpay</option>
-            <option value="UPI">UPI / Google Pay</option>
-            <option value="PayU">PayU</option>
+            <option value="PayU">PayU India</option>
+            <option value="UPI">UPI</option>
+            <option value="Card">Credit / Debit Card</option>
           </select>
         </div>
       </div>
@@ -246,7 +247,7 @@ export default function PaymentsPage() {
                 <th>Company Name</th>
                 <th>Amount</th>
                 <th>Payment Method</th>
-                <th>Razorpay Order ID</th>
+                <th>PayU Transaction ID</th>
                 <th>Payment Date</th>
                 <th>Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
@@ -263,10 +264,10 @@ export default function PaymentsPage() {
                         <span style={{ fontWeight: 700, color: 'var(--admin-primary)' }}>{p.company_name}</span>
                       </td>
                       <td><strong>₹{Number(p.amount || 0).toLocaleString()}</strong></td>
-                      <td>{p.payment_method || 'Razorpay UPI'}</td>
+                      <td>{p.payment_method || 'PayU (UPI / Card)'}</td>
                       <td>
                         <span style={{ fontSize: '0.82rem', fontFamily: 'monospace' }}>
-                          {p.razorpay_order_id || p.order_id || 'N/A'}
+                          {p.payu_transaction_id || p.transaction_id || 'N/A'}
                         </span>
                       </td>
                       <td>{p.created_at ? p.created_at.split('T')[0] : '2026-06-10'}</td>
@@ -367,16 +368,16 @@ export default function PaymentsPage() {
                   <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>₹{Number(selectedPayment.amount || 0).toLocaleString()}</div>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>Payment Method</span>
-                  <div>{selectedPayment.payment_method || 'Razorpay Standard Checkout'}</div>
+                  <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>Payment Gateway / Method</span>
+                  <div>{selectedPayment.payment_method || 'PayU India (UPI / Card)'}</div>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>Razorpay Order ID</span>
-                  <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{selectedPayment.razorpay_order_id || 'N/A'}</div>
+                  <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>PayU Transaction ID</span>
+                  <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{selectedPayment.payu_transaction_id || selectedPayment.transaction_id || 'N/A'}</div>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>Razorpay Payment ID</span>
-                  <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{selectedPayment.razorpay_payment_id || 'Pending'}</div>
+                  <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>PayU Payment Reference</span>
+                  <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{selectedPayment.payu_payment_id || 'Verified'}</div>
                 </div>
               </div>
             </div>

@@ -26,19 +26,7 @@ import InvoiceReceiptModal from '../components/InvoiceReceiptModal';
 import Footer from '../components/Footer';
 import './PaymentPage.css';
 
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
+
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -198,7 +186,7 @@ export default function PaymentPage() {
     setShowGatewayModal(val);
   };
 
-  // Trigger Payment Flow & Open Interactive Payment Option Window
+  // Trigger Payment Flow & Redirect to PayU Hosted Checkout
   const handleProceedToPay = async () => {
     if (paymentState === 'processing' || gatewayProcessing) return;
 
@@ -206,84 +194,48 @@ export default function PaymentPage() {
     setErrorMessage('');
 
     try {
-      // 1. Call Backend to create Razorpay Order (Amount strictly calculated on server)
-      const res = await fetch('http://localhost:5000/api/payments/create-order', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/payments/create-payu-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           company_id: activeCompany.id,
           invoice_id: activeInvoice.id,
-          companyName: activeCompany.company_name,
-          amount: amountInr
+          billing_month: activeInvoice.billing_period || 'August 2026'
         })
       });
 
-      const orderData = await res.json();
-      if (!orderData.success || (!orderData.order_id && !orderData.orderId)) {
+      const data = await res.json();
+      if (!data.success || !data.payuUrl || !data.params) {
         setPaymentState('failed');
-        setErrorMessage(orderData.message || 'Failed to create payment order. Please try again.');
+        setErrorMessage(data.message || 'Failed to initiate PayU payment. Please try again.');
         return;
       }
 
-      const orderId = orderData.order_id || orderData.orderId;
-      const keyId = orderData.key_id || orderData.keyId || 'rzp_test_MCCMRF2026Key';
+      setPaymentState('redirecting');
 
-      setPendingOrderData({
-        orderId,
-        keyId,
-        amount: orderData.amount,
-        amountInr,
-        receiptId: orderData.receipt || `rcpt_${Date.now()}`
+      // Submit dynamic form to PayU Hosted Checkout URL
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = data.payuUrl;
+
+      Object.keys(data.params).forEach((key) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = data.params[key];
+        form.appendChild(input);
       });
 
-      // Try initializing Razorpay SDK if live key is available
-      const isScriptLoaded = await loadRazorpayScript();
-      if (isScriptLoaded && window.Razorpay && !keyId.startsWith('rzp_test_MCCMRF2026Key')) {
-        const options = {
-          key: keyId,
-          amount: orderData.amount,
-          currency: 'INR',
-          name: 'MCC MRF Innovation Park',
-          description: `Incubation Workspace Fee - ${activeInvoice.billing_period || 'August 2026'}`,
-          image: '/mcc-crest-maroon.png',
-          order_id: orderId,
-          prefill: {
-            name: activeCompany.contact_person,
-            email: activeCompany.email,
-            contact: activeCompany.contact_number
-          },
-          theme: { color: '#8B0000' },
-          modal: {
-            ondismiss: function () {
-              setPaymentState('cancelled');
-            }
-          },
-          handler: async function (response) {
-            await verifyPaymentOnServer(
-              response.razorpay_order_id || orderId,
-              response.razorpay_payment_id || `pay_${Date.now()}`,
-              response.razorpay_signature || 'verified_sig_2026'
-            );
-          }
-        };
-
-        try {
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-          setPaymentState('idle');
-          return;
-        } catch (rzpErr) {
-          console.warn('Razorpay SDK init fallback to interactive window:', rzpErr);
-        }
-      }
-
-      // Open Interactive MCC MRF Branded Payment Window (GPay / PhonePe / QR / Card OTP)
-      setPaymentState('idle');
-      setShowGatewayModal(true);
+      document.body.appendChild(form);
+      form.submit();
     } catch (err) {
-      console.error('Payment checkout error:', err);
+      console.error('Error initiating PayU payment:', err);
       setPaymentState('failed');
-      setErrorMessage('Could not initiate payment order. Please check your connection.');
+      setErrorMessage('Failed to connect to PayU payment gateway. Please check network connection.');
     }
   };
 
@@ -319,11 +271,6 @@ export default function PaymentPage() {
               <h1 className="payment-brand-title">MCC MRF Innovation Park</h1>
               <span className="payment-brand-subtitle">Incubation Workspace Portal</span>
             </div>
-          </div>
-
-          <div className="payment-secure-badge">
-            <Lock size={16} />
-            <span>256-Bit Encrypted Secure Payment</span>
           </div>
         </div>
       </header>

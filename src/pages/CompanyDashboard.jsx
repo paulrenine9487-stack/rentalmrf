@@ -10,20 +10,6 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
-    if (window.Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
-
 export default function CompanyDashboard() {
   const [company, setCompany] = useState(null);
   const [payments, setPayments] = useState([]);
@@ -31,12 +17,13 @@ export default function CompanyDashboard() {
   const navigate = useNavigate();
 
   // Payment Gateway Modal State
+  const currentCalendarMonthIdx = new Date().getMonth(); // 0 = Jan, 7 = Aug, 11 = Dec
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedStartMonth, setSelectedStartMonth] = useState(7); // August
-  const [selectedEndMonth, setSelectedEndMonth] = useState(8);   // September
+  const [selectedStartMonth, setSelectedStartMonth] = useState(currentCalendarMonthIdx);
+  const [selectedEndMonth, setSelectedEndMonth] = useState(currentCalendarMonthIdx);
   const [isSelectingRange, setIsSelectingRange] = useState(false);
 
-  // Razorpay Payment Flow States: 'idle' | 'creating' | 'checkout' | 'verifying' | 'success' | 'failed' | 'cancelled'
+  // PayU Payment Flow States: 'idle' | 'creating' | 'redirecting' | 'verifying' | 'success' | 'failed' | 'cancelled'
   const [paymentState, setPaymentState] = useState('idle');
   const [paymentResult, setPaymentResult] = useState(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -97,7 +84,55 @@ export default function CompanyDashboard() {
     navigate('/');
   };
 
+  // Find all pending/overdue payments
+  const pendingPayments = (payments || []).filter(
+    (p) => p.status === 'Pending' || p.status === 'PENDING' || p.status === 'Overdue'
+  );
+  const oldestPendingPayment = pendingPayments.length > 0
+    ? [...pendingPayments].sort((a, b) => (a.id || 0) - (b.id || 0))[0]
+    : null;
+  const isPastOverdue = Boolean(oldestPendingPayment);
+
+  const openPaymentModal = () => {
+    if (isPastOverdue && oldestPendingPayment) {
+      const monthName = (oldestPendingPayment.month_year || oldestPendingPayment.month || '').split(' ')[0];
+      const oldestUnpaidIdx = MONTHS.findIndex((m) => m.toLowerCase() === monthName.toLowerCase());
+      if (oldestUnpaidIdx !== -1 && oldestUnpaidIdx <= currentCalendarMonthIdx) {
+        setSelectedStartMonth(oldestUnpaidIdx);
+        setSelectedEndMonth(oldestUnpaidIdx);
+      } else {
+        setSelectedStartMonth(currentCalendarMonthIdx);
+        setSelectedEndMonth(currentCalendarMonthIdx);
+      }
+    } else {
+      setSelectedStartMonth(currentCalendarMonthIdx);
+      setSelectedEndMonth(currentCalendarMonthIdx);
+    }
+    setIsSelectingRange(false);
+    setPaymentState('idle');
+    setPaymentResult(null);
+    setShowPaymentModal(true);
+  };
+
   const handleMonthClick = (index) => {
+    // Rule 1: Do NOT allow selecting future months beyond current calendar month
+    if (index > currentCalendarMonthIdx) {
+      alert('Future months cannot be selected for advance payment.');
+      return;
+    }
+
+    // Rule 2: Require paying oldest overdue payment first
+    if (isPastOverdue && oldestPendingPayment) {
+      const monthName = (oldestPendingPayment.month_year || oldestPendingPayment.month || '').split(' ')[0];
+      const oldestUnpaidIdx = MONTHS.findIndex((m) => m.toLowerCase() === monthName.toLowerCase());
+      if (oldestUnpaidIdx !== -1 && index !== oldestUnpaidIdx) {
+        alert(`You have an overdue payment for ${oldestPendingPayment.month_year || oldestPendingPayment.month}. Please pay your overdue past payment first.`);
+        setSelectedStartMonth(oldestUnpaidIdx);
+        setSelectedEndMonth(oldestUnpaidIdx);
+        return;
+      }
+    }
+
     if (!isSelectingRange || index < selectedStartMonth) {
       setSelectedStartMonth(index);
       setSelectedEndMonth(index);
@@ -135,157 +170,60 @@ export default function CompanyDashboard() {
   const gstAmount = Math.round(monthlyRent * 0.18);
   const totalAmount = monthlyRent + gstAmount;
 
-  // Razorpay Checkout Integration
-  const handleProceedToRazorpayPayment = async () => {
+  // PayU Hosted Checkout Integration
+  const handleProceedToPayUPayment = async () => {
     if (paymentState !== 'idle' && paymentState !== 'failed' && paymentState !== 'cancelled') return;
 
     setPaymentState('creating');
 
     try {
-      // 1. Send request to Node.js backend to create Razorpay Order
-      const orderRes = await fetch('http://localhost:5000/api/payment/create-order', {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/payments/create-payu-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
         body: JSON.stringify({
-          amount: totalAmount,
-          currency: 'INR',
-          companyId: activeCompany.id,
-          companyName: activeCompany.company_name,
-          month: rangeText,
-          customerName: activeCompany.contact_person,
-          customerEmail: activeCompany.email,
-          customerPhone: activeCompany.contact_number
+          company_id: activeCompany.id,
+          billing_month: rangeText
         })
       });
 
-      const orderData = await orderRes.json();
+      const data = await res.json();
 
-      if (!orderData.success || !orderData.orderId) {
+      if (!data.success || !data.payuUrl || !data.params) {
         setPaymentState('failed');
         setPaymentResult({
           status: 'FAILED',
-          message: orderData.message || 'Failed to create payment order. Please try again.'
+          message: data.message || 'Failed to initiate PayU payment. Please try again.'
         });
         return;
       }
 
-      // 2. Load Razorpay Checkout SDK Script
-      setPaymentState('checkout');
-      const isScriptLoaded = await loadRazorpayScript();
+      setPaymentState('redirecting');
 
-      if (!isScriptLoaded) {
-        console.warn('Razorpay SDK script load timeout, fallback to simulated checkout');
-      }
+      // Submit dynamic form to PayU Hosted Checkout URL
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = data.payuUrl;
 
-      // 3. Configure Razorpay Standard Checkout options
-      const options = {
-        key: orderData.keyId || 'rzp_test_MCCMRF2026Key',
-        amount: orderData.amount, // in paise
-        currency: 'INR',
-        name: 'MCC-MRF Innovation Park',
-        description: `Incubation Workspace Payment - ${rangeText}`,
-        image: '/mcc-crest-maroon.png',
-        order_id: orderData.orderId,
-        prefill: {
-          name: activeCompany.contact_person || 'Prasath',
-          email: activeCompany.email || 'accounts@thegreenera.in',
-          contact: activeCompany.contact_number || '9361328432'
-        },
-        theme: {
-          color: '#8B0000'
-        },
-        handler: async function (response) {
-          setPaymentState('verifying');
-          try {
-            const verifyRes = await fetch('http://localhost:5000/api/payment/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || orderData.orderId,
-                razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
-                razorpay_signature: response.razorpay_signature || 'verified_sig_2026',
-                method: 'Razorpay UPI/Google Pay'
-              })
-            });
+      Object.keys(data.params).forEach((key) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = data.params[key];
+        form.appendChild(input);
+      });
 
-            const verifyData = await verifyRes.json();
-
-            if (verifyData.success) {
-              setPaymentState('success');
-              const newTxn = {
-                id: Date.now(),
-                month_year: rangeText,
-                amount: totalAmount,
-                status: 'Paid',
-                paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-                orderId: response.razorpay_order_id || orderData.orderId
-              };
-              setPayments((prev) => [newTxn, ...prev]);
-              setPaymentResult({
-                status: 'SUCCESS',
-                paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-                orderId: response.razorpay_order_id || orderData.orderId,
-                amount: totalAmount,
-                month: rangeText,
-                date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-              });
-            } else {
-              setPaymentState('failed');
-              setPaymentResult({
-                status: 'FAILED',
-                message: verifyData.message || 'Payment signature verification failed'
-              });
-            }
-          } catch (err) {
-            console.error('Verification error:', err);
-            setPaymentState('success');
-            setPaymentResult({
-              status: 'SUCCESS',
-              paymentId: response.razorpay_payment_id || `pay_${Date.now()}`,
-              orderId: response.razorpay_order_id || orderData.orderId,
-              amount: totalAmount,
-              month: rangeText,
-              date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-            });
-          }
-        },
-        modal: {
-          onDismiss: function () {
-            setPaymentState('cancelled');
-            setPaymentResult({
-              status: 'CANCELLED',
-              message: 'Your payment was not completed. No payment has been confirmed.'
-            });
-          }
-        }
-      };
-
-      if (window.Razorpay) {
-        const rzp = new window.Razorpay(options);
-        rzp.on('payment.failed', function (resp) {
-          setPaymentState('failed');
-          setPaymentResult({
-            status: 'FAILED',
-            message: resp.error?.description || 'Payment failed. Please try again or choose another payment method.'
-          });
-        });
-        rzp.open();
-      } else {
-        // Fallback simulation for local offline testing
-        setTimeout(() => {
-          options.handler({
-            razorpay_order_id: orderData.orderId,
-            razorpay_payment_id: `pay_${Date.now()}`,
-            razorpay_signature: 'test_signature_mock'
-          });
-        }, 1200);
-      }
+      document.body.appendChild(form);
+      form.submit();
     } catch (err) {
-      console.error('Payment order creation error:', err);
+      console.error('Error initiating PayU payment:', err);
       setPaymentState('failed');
       setPaymentResult({
         status: 'FAILED',
-        message: 'Failed to create payment order. Please check network connection.'
+        message: 'Failed to initiate PayU payment. Please check your network connection.'
       });
     }
   };
@@ -297,12 +235,13 @@ export default function CompanyDashboard() {
   };
 
   const getProceedBtnText = () => {
-    if (paymentState === 'creating') return 'Creating Secure Payment...';
-    if (paymentState === 'checkout') return 'Opening Secure Checkout...';
+    if (paymentState === 'creating') return 'Creating PayU Order...';
+    if (paymentState === 'redirecting') return 'Connecting to PayU...';
     if (paymentState === 'verifying') return 'Verifying Payment...';
-    if (paymentState === 'success') return 'Payment Successful';
     return `Proceed to Pay ₹${totalAmount.toLocaleString()}`;
   };
+
+
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -464,12 +403,9 @@ export default function CompanyDashboard() {
   }
 
   // Determine current payment status
-  const currentPayment = payments.find((p) => p.status === 'Pending') || payments[0] || {
-    amount: activeCompany.monthly_rate || 10000,
-    month_year: 'August 2026',
-    due_date: '31st August 2026',
-    status: 'Pending'
-  };
+  const hasPaymentHistory = Boolean(payments && payments.length > 0);
+  const pendingPayment = hasPaymentHistory ? payments.find((p) => p.status === 'Pending' || p.status === 'PENDING') : null;
+  const currentPayment = pendingPayment || (hasPaymentHistory ? payments[0] : null);
 
   return (
     <div className="dashboard-wrapper">
@@ -492,7 +428,7 @@ export default function CompanyDashboard() {
 
       {/* MAIN DASHBOARD CONTENT */}
       <main className="dashboard-main container">
-        <div className="dashboard-title-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+        <div className="dashboard-title-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
           <div style={{ textAlign: 'left' }}>
             <h1 className="dashboard-title" style={{ margin: 0, fontSize: '2rem', fontWeight: 800, color: '#8B0000' }}>Payment Dashboard</h1>
             <p className="dashboard-subtitle" style={{ margin: '4px 0 0 0', fontSize: '0.92rem', color: '#64748B' }}>Manage your monthly rent payments</p>
@@ -503,6 +439,34 @@ export default function CompanyDashboard() {
             <span style={{ color: '#1F2937' }}>Payments</span>
           </div>
         </div>
+
+        {/* OVERDUE PAYMENT WARNING BANNER */}
+        {isPastOverdue && oldestPendingPayment && (
+          <div
+            style={{
+              backgroundColor: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '12px',
+              padding: '1.1rem 1.35rem',
+              marginBottom: '1.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.85rem',
+              color: '#991B1B',
+              boxShadow: '0 4px 12px rgba(220, 38, 38, 0.08)'
+            }}
+          >
+            <AlertTriangle size={24} color="#DC2626" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <strong style={{ fontSize: '1rem', display: 'block', marginBottom: '2px', color: '#7F1D1D' }}>
+                ⚠️ Action Required: Overdue Payment Notice
+              </strong>
+              <span style={{ fontSize: '0.86rem', color: '#991B1B' }}>
+                You have an unpaid past payment for <strong>{oldestPendingPayment.month_year || oldestPendingPayment.month}</strong> (₹{Number(oldestPendingPayment.amount || activeCompany.monthly_rate || 0).toLocaleString()}). Please clear your past due payment first before paying current or subsequent months.
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="dashboard-grid">
           {/* COLUMN 1: Company Information */}
@@ -559,53 +523,155 @@ export default function CompanyDashboard() {
             </div>
           </div>
 
-          {/* COLUMN 2: Current Month Payment */}
-          <div className="dashboard-card">
-            <h2 className="card-title">Current Month Payment</h2>
-            <hr className="card-divider" />
-            <div className="payment-due-box">
-              <p className="due-label">Amount Due:</p>
-              <h3 className="due-amount">
-                ₹{Number(currentPayment.amount || activeCompany.monthly_rate || 10000).toLocaleString()}
-              </h3>
-
-              <div className="payment-details">
-                <div className="payment-detail-item">
-                  <span className="detail-label">Month:</span>
-                  <span className="detail-value">{currentPayment.month_year || 'August 2026'}</span>
-                </div>
-                <div className="payment-detail-item">
-                  <span className="detail-label">Due Date:</span>
-                  <span className="detail-value">{currentPayment.due_date || '31st August 2026'}</span>
-                </div>
-                <div className="payment-detail-item">
-                  <span className="detail-label">Status:</span>
-                  <span
-                    className={`status-badge ${
-                      currentPayment.status === 'Paid' ? 'approved' : 'pending'
-                    }`}
-                    style={{
-                      backgroundColor: currentPayment.status === 'Paid' ? '#28a745' : '#FFC107',
-                      color: currentPayment.status === 'Paid' ? '#FFFFFF' : '#000000'
-                    }}
-                  >
-                    {currentPayment.status || 'Pending'}
-                  </span>
-                </div>
+          {/* COLUMN 2: Current Month Payment OR 2+ Months Overdue Lockout Card */}
+          {pendingPayments.length >= 2 ? (
+            <div className="dashboard-card" style={{ border: '2px solid #DC2626', backgroundColor: '#FEF2F2' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 className="card-title" style={{ margin: 0, color: '#991B1B' }}>Overdue Payment Lockout</h2>
+                <span style={{ backgroundColor: '#DC2626', color: '#FFFFFF', padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800 }}>
+                  {pendingPayments.length} MONTHS OVERDUE
+                </span>
               </div>
+              <hr className="card-divider" style={{ backgroundColor: '#FECACA' }} />
+              <div className="payment-due-box">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: '#991B1B' }}>
+                  <AlertTriangle size={20} color="#DC2626" />
+                  <span style={{ fontSize: '0.88rem', fontWeight: 700 }}>Current Month Payment Hidden & Suspended</span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#7F1D1D', lineHeight: 1.5, margin: '0 0 1rem 0' }}>
+                  Your account has <strong>{pendingPayments.length} unpaid monthly rent payments</strong> ({pendingPayments.map(p => p.month_year || p.month).join(', ')}). You cannot view or pay current month rent until all past overdue months are cleared in order.
+                </p>
 
-              {currentPayment.status !== 'Paid' && (
+                <p className="due-label" style={{ color: '#991B1B' }}>Earliest Overdue Amount Due:</p>
+                <h3 className="due-amount" style={{ color: '#DC2626' }}>
+                  ₹{Number(oldestPendingPayment?.amount || activeCompany.monthly_rate || 0).toLocaleString()}
+                </h3>
+
+                <div className="payment-details">
+                  <div className="payment-detail-item">
+                    <span className="detail-label">Overdue Month:</span>
+                    <span className="detail-value" style={{ color: '#991B1B', fontWeight: 800 }}>
+                      {oldestPendingPayment?.month_year || oldestPendingPayment?.month}
+                    </span>
+                  </div>
+                  <div className="payment-detail-item">
+                    <span className="detail-label">Account Status:</span>
+                    <span
+                      className="status-badge"
+                      style={{
+                        backgroundColor: '#DC2626',
+                        color: '#FFFFFF',
+                        fontWeight: 700,
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      Current Pay Suspended
+                    </span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   className="pay-now-btn"
-                  onClick={() => navigate('/payment')}
+                  style={{ backgroundColor: '#DC2626' }}
+                  onClick={openPaymentModal}
                 >
                   <CreditCard size={18} />
-                  <span>Proceed to Pay ₹{Number(activeCompany.monthly_rate || 10000).toLocaleString()}</span>
+                  <span>Pay Earliest Overdue ({oldestPendingPayment?.month_year || oldestPendingPayment?.month}) ₹{Number(oldestPendingPayment?.amount || activeCompany.monthly_rate || 0).toLocaleString()}</span>
                 </button>
-              )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="dashboard-card" style={{ borderColor: isPastOverdue ? '#FECACA' : '#E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 className="card-title" style={{ margin: 0 }}>
+                  {isPastOverdue ? 'Overdue Payment' : 'Current Month Payment'}
+                </h2>
+                {isPastOverdue && (
+                  <span style={{ backgroundColor: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 800 }}>
+                    OVERDUE FIRST
+                  </span>
+                )}
+              </div>
+              <hr className="card-divider" />
+              <div className="payment-due-box">
+                <p className="due-label">
+                  {isPastOverdue ? 'Overdue Amount Due:' : (currentPayment ? 'Amount Due:' : 'Monthly Workspace Rate:')}
+                </p>
+                <h3 className="due-amount" style={{ color: isPastOverdue ? '#DC2626' : '#8B0000' }}>
+                  ₹{Number((currentPayment && currentPayment.amount) || activeCompany.monthly_rate || 0).toLocaleString()}
+                </h3>
+
+                <div className="payment-details">
+                  <div className="payment-detail-item">
+                    <span className="detail-label">Month:</span>
+                    <span className="detail-value">
+                      {(currentPayment && (currentPayment.month_year || currentPayment.month)) || 'August 2026'}
+                    </span>
+                  </div>
+                  <div className="payment-detail-item">
+                    <span className="detail-label">Due Date:</span>
+                    <span className="detail-value">
+                      {(currentPayment && currentPayment.due_date) || '31st August 2026'}
+                    </span>
+                  </div>
+                  <div className="payment-detail-item">
+                    <span className="detail-label">Status:</span>
+                    <span
+                      className="status-badge"
+                      style={{
+                        backgroundColor:
+                          isPastOverdue
+                            ? '#FEF2F2'
+                            : (currentPayment?.status === 'Paid' || currentPayment?.status === 'Completed' || currentPayment?.status === 'SUCCESS'
+                            ? '#DCFCE7'
+                            : currentPayment?.status === 'Pending'
+                            ? '#FEF3C7'
+                            : '#DCFCE7'),
+                        color:
+                          isPastOverdue
+                            ? '#DC2626'
+                            : (currentPayment?.status === 'Paid' || currentPayment?.status === 'Completed' || currentPayment?.status === 'SUCCESS'
+                            ? '#16A34A'
+                            : currentPayment?.status === 'Pending'
+                            ? '#D97706'
+                            : '#15803D'),
+                        border: isPastOverdue
+                          ? '1px solid #FECACA'
+                          : (currentPayment
+                          ? `1px solid ${currentPayment.status === 'Paid' ? '#86EFAC' : '#FDE68A'}`
+                          : '1px solid #86EFAC'),
+                        fontWeight: 700,
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      {isPastOverdue ? 'Overdue (Pending)' : (currentPayment ? (currentPayment.status || 'Pending') : 'Active Account')}
+                    </span>
+                  </div>
+                </div>
+
+                {(!currentPayment || currentPayment.status !== 'Paid') && (
+                  <button
+                    type="button"
+                    className="pay-now-btn"
+                    style={{ backgroundColor: isPastOverdue ? '#DC2626' : '#8B0000' }}
+                    onClick={openPaymentModal}
+                  >
+                    <CreditCard size={18} />
+                    <span>
+                      {isPastOverdue
+                        ? `Pay Overdue Payment (${oldestPendingPayment.month_year || oldestPendingPayment.month}) ₹${Number(oldestPendingPayment.amount || activeCompany.monthly_rate || 0).toLocaleString()}`
+                        : `Proceed to Pay ₹${Number((currentPayment && currentPayment.amount) || activeCompany.monthly_rate || 0).toLocaleString()}`}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* COLUMN 3: Payment History */}
           <div className="dashboard-card history-card-col">
@@ -640,7 +706,7 @@ export default function CompanyDashboard() {
                           {item.month_year || item.month || 'August 2026'}
                         </h4>
                         <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block', marginTop: '2px' }}>
-                          {item.payment_method || 'Razorpay Standard Checkout'}
+                          {item.payment_method || 'PayU India (UPI / Card)'}
                         </span>
                       </div>
 
@@ -706,9 +772,9 @@ export default function CompanyDashboard() {
                               place: activeCompany.place,
                               billing_period: item.month_year || item.month || 'August 2026',
                               amount: item.amount || activeCompany.monthly_rate,
-                              payment_method: item.payment_method || 'Razorpay Standard Checkout',
+                              payment_method: item.payment_method || 'PayU India (UPI / Card)',
                               payment_date: item.created_at || item.date || new Date().toISOString(),
-                              payment_id: item.razorpay_payment_id || item.txnid || `pay_${item.id}`
+                              payment_id: item.payu_payment_id || item.transaction_id || item.txnid || `pay_${item.id}`
                             });
                           }}
                         >
@@ -723,20 +789,19 @@ export default function CompanyDashboard() {
                 <div
                   style={{
                     backgroundColor: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
+                    border: '1px dashed #CBD5E1',
                     borderRadius: '10px',
-                    padding: '1rem',
-                    display: 'flex',
-                    justify: 'space-between',
-                    alignItems: 'center'
+                    padding: '2.5rem 1rem',
+                    textAlign: 'center',
+                    color: '#64748B'
                   }}
                 >
-                  <div>
-                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#1F2937' }}>June 2026</h4>
-                    <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Workspace Incubation</span>
-                  </div>
-                  <span style={{ fontSize: '1rem', fontWeight: 800, color: '#8B0000' }}>
-                    ₹{Number(activeCompany.monthly_rate || 0).toLocaleString()}
+                  <Receipt size={32} color="#94A3B8" style={{ margin: '0 auto 0.5rem auto', display: 'block' }} />
+                  <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.95rem', fontWeight: 700, color: '#334155' }}>
+                    No Payment History
+                  </h4>
+                  <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                    Completed monthly rent payments will appear here.
                   </span>
                 </div>
               )}
@@ -853,12 +918,15 @@ export default function CompanyDashboard() {
                     <div className="months-grid">
                       {MONTHS.map((mName, idx) => {
                         const isSelected = idx >= selectedStartMonth && idx <= selectedEndMonth;
+                        const isFuture = idx > currentCalendarMonthIdx;
                         return (
                           <button
                             key={mName}
                             type="button"
-                            className={`month-cell-btn ${isSelected ? 'active' : ''}`}
+                            className={`month-cell-btn ${isSelected ? 'active' : ''} ${isFuture ? 'disabled' : ''}`}
                             onClick={() => handleMonthClick(idx)}
+                            disabled={isFuture}
+                            title={isFuture ? 'Future months cannot be selected for advance payment' : ''}
                           >
                             {mName}
                           </button>
@@ -908,7 +976,7 @@ export default function CompanyDashboard() {
                   <button
                     type="button"
                     className="gateway-proceed-btn"
-                    onClick={handleProceedToRazorpayPayment}
+                    onClick={handleProceedToPayUPayment}
                     disabled={paymentState !== 'idle'}
                   >
                     {getProceedBtnText()}
@@ -1059,9 +1127,9 @@ export default function CompanyDashboard() {
                 <div className="receipt-col">
                   <h4>Payment Details</h4>
                   <p><strong>Receipt ID:</strong> {paymentResult.orderId}</p>
-                  <p><strong>Razorpay Payment ID:</strong> {paymentResult.paymentId}</p>
+                  <p><strong>PayU Reference ID:</strong> {paymentResult.paymentId}</p>
                   <p><strong>Payment Date:</strong> {paymentResult.date}</p>
-                  <p><strong>Payment Method:</strong> Razorpay Standard Checkout (UPI/Card)</p>
+                  <p><strong>Payment Method:</strong> PayU India (UPI / Card)</p>
                   <p><strong>Status:</strong> <span className="paid-tag">SUCCESS</span></p>
                 </div>
               </div>

@@ -650,3 +650,427 @@
     flex-wrap: wrap;
   }
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+/* ==========================================================================
+   SMTP MANAGEMENT MODULE PREMIUM DESIGN SYSTEM
+   ========================================================================== */
+
+/* Sub-Tab Navigation Bar */
+.smtp-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #E2E8F0;
+  margin-bottom: 1.75rem;
+}
+
+.smtp-tab-btn {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #475569;
+  padding: 0.65rem 1.35rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.smtp-tab-btn:hover {
+  color: #8B0000;
+  border-color: #8B0000;
+  background-color: #FEF2F2;
+}
+
+.smtp-tab-btn.active {
+  color: #8B0000;
+  background-color: #FEF2F2;
+  border: 2px solid #8B0000;
+  box-shadow: 0 2px 8px rgba(139, 0, 0, 0.12);
+}
+
+/* Active Dispatcher Hero Banner */
+.smtp-hero-banner {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-left: 6px solid #16A34A;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.smtp-hero-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Premium Table Container */
+.smtp-table-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 1.75rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.smtp-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.smtp-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+}
+
+.smtp-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.smtp-table th {
+  background-color: #F8FAFC;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1rem 1.25rem;
+  border-bottom: 1.5px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.smtp-table td {
+  padding: 1.1rem 1.25rem;
+  font-size: 0.88rem;
+  color: #1E293B;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+
+.smtp-table tr:last-child td {
+  border-bottom: none;
+}
+
+.smtp-table tr:hover td {
+  background-color: #FAF5F5;
+}
+
+/* Distinct Action Buttons */
+.smtp-action-btn {
+  padding: 0.45rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.smtp-action-btn-test {
+  background-color: #EFF6FF;
+  color: #1D4ED8;
+  border-color: #BFDBFE;
+}
+.smtp-action-btn-test:hover {
+  background-color: #DBEAFE;
+}
+
+.smtp-action-btn-edit {
+  background-color: #F8FAFC;
+  color: #334155;
+  border-color: #CBD5E1;
+}
+.smtp-action-btn-edit:hover {
+  background-color: #F1F5F9;
+}
+
+.smtp-action-btn-delete {
+  background-color: #FEF2F2;
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+.smtp-action-btn-delete:hover {
+  background-color: #FEE2E2;
+}
+
+/* Badge Pills */
+.smtp-badge-active {
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+  padding: 0.3rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.smtp-badge-active:hover {
+  background-color: #BBF7D0;
+}
+
+.smtp-badge-inactive {
+  background-color: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+  padding: 0.3rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.smtp-badge-inactive:hover {
+  background-color: #E2E8F0;
+  color: #334155;
+}
+
+/* ==========================================================================
+   ENTERPRISE MODAL & FORM CONTROLS STYLING
+   ========================================================================== */
+
+/* Overlay */
+.admin-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1.5rem;
+}
+
+/* Card */
+.admin-modal-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid #E2E8F0;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Header */
+.admin-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #8B0000;
+  margin: 0;
+}
+
+.login-card-close,
+.modal-close-btn {
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  color: #64748B;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.login-card-close:hover,
+.modal-close-btn:hover {
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+/* Body & Form Grid */
+.admin-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.15rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.form-group.full-width {
+  grid-column: span 2;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  display: block;
+}
+
+/* Form Inputs */
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: #0F172A;
+  background-color: #F8FAFC;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: #8B0000;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.12);
+}
+
+.form-input::placeholder {
+  color: #94A3B8;
+}
+
+/* Modal Actions & Buttons */
+.form-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #E2E8F0;
+  margin-top: 1.25rem;
+}
+
+.cancel-btn {
+  background-color: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  padding: 0.65rem 1.35rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background-color: #E2E8F0;
+  color: #1E293B;
+  border-color: #94A3B8;
+}
+
+.add-company-btn {
+  background-color: #8B0000;
+  color: #FFFFFF;
+  border: 1px solid #650000;
+  padding: 0.65rem 1.35rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(139, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.add-company-btn:hover {
+  background-color: #650000;
+  box-shadow: 0 4px 14px rgba(139, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.add-company-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+

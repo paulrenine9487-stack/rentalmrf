@@ -2,8 +2,12 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import CompanyDashboard from './pages/CompanyDashboard';
 import PaymentPage from './pages/PaymentPage';
+import PaymentSuccessPage from './pages/PaymentSuccessPage';
+import PaymentFailedPage from './pages/PaymentFailedPage';
+import PaymentCancelledPage from './pages/PaymentCancelledPage';
 
 // Enterprise Admin & Super Admin Panel Components
 import AdminLoginPage from './pages/admin/AdminLoginPage';
@@ -26,6 +30,7 @@ export default function App() {
         {/* Public Website Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/change-password" element={<ChangePasswordPage />} />
 
         {/* Incubated Company Dashboard & Payment Routes */}
         <Route path="/dashboard" element={<CompanyDashboard />} />
@@ -33,6 +38,9 @@ export default function App() {
         <Route path="/Novara_company" element={<CompanyDashboard />} />
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/payment/:invoiceId" element={<PaymentPage />} />
+        <Route path="/payment/success" element={<PaymentSuccessPage />} />
+        <Route path="/payment/failed" element={<PaymentFailedPage />} />
+        <Route path="/payment/cancelled" element={<PaymentCancelledPage />} />
 
         {/* Dedicated Admin & Super Admin Login Gateway */}
         <Route path="/Novara_admin" element={<AdminLoginPage />} />

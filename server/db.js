@@ -1,3 +1,4 @@
+require('dotenv').config();
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
@@ -10,7 +11,7 @@ const INITIAL_COMPANIES = [
     company_name: 'test new',
     contact_number: '9876543210',
     email: 'franklin@mcc.edu.in',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 1,
     workers_count: 2,
     monthly_rate: 1,
@@ -27,7 +28,7 @@ const INITIAL_COMPANIES = [
     company_name: 'TMS',
     contact_number: '9876543211',
     email: 'jeevasenthil103@gmail.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 2,
     workers_count: 3,
     monthly_rate: 15000,
@@ -44,7 +45,7 @@ const INITIAL_COMPANIES = [
     company_name: 'LexPOSH LLP',
     contact_number: '9876543212',
     email: 'contact@lexposh.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 2,
     monthly_rate: 12000,
@@ -61,7 +62,7 @@ const INITIAL_COMPANIES = [
     company_name: 'I View Sence',
     contact_number: '9876543213',
     email: 'kannan@iviewsense.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 1,
     workers_count: 1,
     monthly_rate: 3000,
@@ -78,7 +79,7 @@ const INITIAL_COMPANIES = [
     company_name: 'CLOUDELU LABS (OPC) PRIVATE LIMITED',
     contact_number: '9876543214',
     email: 'vivek@cloudelu.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 2,
     workers_count: 2,
     monthly_rate: 12000,
@@ -95,7 +96,7 @@ const INITIAL_COMPANIES = [
     company_name: 'Green Era',
     contact_number: '9361328432',
     email: 'accounts@thegreenera.in',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 1,
     monthly_rate: 10000,
@@ -112,7 +113,7 @@ const INITIAL_COMPANIES = [
     company_name: 'Cafe',
     contact_number: '9876543215',
     email: 'Lee@gmail.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 4,
     monthly_rate: 20000,
@@ -129,7 +130,7 @@ const INITIAL_COMPANIES = [
     company_name: 'Five Amstrong',
     contact_number: '9876543216',
     email: 'abrahamrebairoj@fiveangstrom.in',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 1,
     workers_count: 2,
     monthly_rate: 10000,
@@ -146,7 +147,7 @@ const INITIAL_COMPANIES = [
     company_name: 'Reef',
     contact_number: '9876543217',
     email: 'vinod@gmail.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 5,
     monthly_rate: 40000,
@@ -163,7 +164,7 @@ const INITIAL_COMPANIES = [
     company_name: 'demo',
     contact_number: '9876543218',
     email: 'demo@gmail.com',
-    password: 'mccmrfip123',
+    password: 'Mccmrfip@2025',
     interns_count: 0,
     workers_count: 0,
     monthly_rate: 0,
@@ -274,7 +275,8 @@ const INITIAL_SOCIAL_LINKS = [
 
 const INITIAL_ROLES = [
   { id: 1, name: 'SUPER_ADMIN', description: 'Full system control with unrestricted access to all modules and configurations' },
-  { id: 2, name: 'ADMIN', description: 'Operational administration with restricted updates and read-only access to system settings' }
+  { id: 2, name: 'ADMIN', description: 'Operational administration with restricted updates and read-only access to system settings' },
+  { id: 3, name: 'COMPANY', description: 'Incubated company account with workspace portal access' }
 ];
 
 const INITIAL_PERMISSIONS = [
@@ -296,7 +298,7 @@ const INITIAL_PERMISSIONS = [
 ];
 
 // Fallback in-memory stores
-let inMemoryCompanies = INITIAL_COMPANIES.map(c => ({ ...c }));
+let inMemoryCompanies = INITIAL_COMPANIES.map(c => ({ ...c, password: 'Mccmrfip@2025' }));
 let inMemoryTransactions = [...INITIAL_TRANSACTIONS];
 let inMemoryPlaces = [...INITIAL_PLACES];
 let inMemoryMenus = [...INITIAL_MENUS];
@@ -307,6 +309,9 @@ let inMemoryRoles = [...INITIAL_ROLES];
 let inMemoryPermissions = [...INITIAL_PERMISSIONS];
 let inMemoryAuditLogs = [];
 let inMemoryPayments = [];
+let inMemoryEmailLogs = [];
+const DEFAULT_COMPANY_PASSWORD_HASH = bcrypt.hashSync('Mccmrfip@2025', 10);
+
 let inMemoryUsers = [
   {
     id: 1,
@@ -316,6 +321,9 @@ let inMemoryUsers = [
     password_hash: bcrypt.hashSync('super2024', 10),
     role_id: 1,
     role_name: 'SUPER_ADMIN',
+    role: 'SUPER_ADMIN',
+    account_status: 'ACTIVE',
+    must_change_password: false,
     status: 'Active',
     created_at: new Date().toISOString()
   },
@@ -327,30 +335,54 @@ let inMemoryUsers = [
     password_hash: bcrypt.hashSync('Novara2024', 10),
     role_id: 2,
     role_name: 'ADMIN',
+    role: 'ADMIN',
+    account_status: 'ACTIVE',
+    must_change_password: false,
     status: 'Active',
     created_at: new Date().toISOString()
-  }
+  },
+  ...INITIAL_COMPANIES.map((c, idx) => ({
+    id: idx + 10,
+    company_id: c.id,
+    name: c.company_name,
+    email: c.email,
+    username: c.email,
+    password_hash: DEFAULT_COMPANY_PASSWORD_HASH,
+    role_id: 3,
+    role_name: 'COMPANY',
+    role: 'COMPANY',
+    must_change_password: true,
+    account_status: 'ACTIVE',
+    status: 'Active',
+    created_at: new Date().toISOString()
+  }))
 ];
 
+let inMemorySmtpSettings = [];
 let useInMemory = false;
 let dbPool = null;
+let dbConnectionConfig = null;
+let lastDbError = null;
 
 async function initDb() {
-  try {
-    const config = {
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      connectTimeout: 2000
-    };
+  const config = {
+    host: process.env.MYSQL_HOST || process.env.DB_HOST || 'localhost',
+    port: Number(process.env.MYSQL_PORT || process.env.DB_PORT || 3306),
+    user: process.env.MYSQL_USER || process.env.DB_USER || 'root',
+    password: process.env.MYSQL_PASSWORD ?? process.env.DB_PASSWORD ?? '',
+    connectTimeout: 5000
+  };
+  const dbName = process.env.MYSQL_DATABASE || process.env.DB_NAME || 'mccmrf_rental';
+  dbConnectionConfig = { host: config.host, port: config.port, database: dbName, user: config.user };
 
+  try {
     const connection = await mysql.createConnection(config);
-    await connection.query(`CREATE DATABASE IF NOT EXISTS mccmrf_rental;`);
+    await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
     await connection.end();
 
     dbPool = mysql.createPool({
       ...config,
-      database: 'mccmrf_rental',
+      database: dbName,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0
@@ -388,17 +420,36 @@ async function initDb() {
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        company_id INT DEFAULT NULL,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         username VARCHAR(100) UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
-        role_id INT DEFAULT 2,
+        role_id INT DEFAULT 3,
+        role VARCHAR(50) DEFAULT 'COMPANY',
+        must_change_password TINYINT(1) DEFAULT 1,
+        account_status VARCHAR(50) DEFAULT 'ACTIVE',
         status VARCHAR(50) DEFAULT 'Active',
+        last_login TIMESTAMP NULL DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         FOREIGN KEY (role_id) REFERENCES roles(id)
       );
     `);
+
+    // Ensure columns exist on users table if created under earlier schema
+    const userAlterColumns = [
+      "ADD COLUMN company_id INT DEFAULT NULL",
+      "ADD COLUMN must_change_password TINYINT(1) DEFAULT 1",
+      "ADD COLUMN account_status VARCHAR(50) DEFAULT 'ACTIVE'",
+      "ADD COLUMN last_login TIMESTAMP NULL DEFAULT NULL",
+      "ADD COLUMN role VARCHAR(50) DEFAULT 'COMPANY'"
+    ];
+    for (const colClause of userAlterColumns) {
+      try {
+        await dbPool.query(`ALTER TABLE users ${colClause}`);
+      } catch (colErr) {}
+    }
 
     // 3. Places Table
     await dbPool.query(`
@@ -438,11 +489,17 @@ async function initDb() {
       );
     `);
 
-    // Ensure s_no values start at 1 sequentially and default passwords are updated to mccmrfip123
+    // Clean test data added during test executions
+    try {
+      await dbPool.query(`DELETE FROM users WHERE email LIKE 'testcompany_%' OR email = 'arun@greenhorizon.in'`);
+      await dbPool.query(`DELETE FROM companies WHERE email LIKE 'testcompany_%' OR email = 'arun@greenhorizon.in' OR company_name = 'Green Horizon Labs' OR company_name = 'Test Innovation Era'`);
+    } catch (e) {}
+
+    // Ensure s_no values start at 1 sequentially and default passwords are updated to Mccmrfip@2025
     for (const comp of INITIAL_COMPANIES) {
       await dbPool.query(`UPDATE companies SET s_no = ? WHERE id = ?`, [comp.s_no, comp.id]);
     }
-    await dbPool.query(`UPDATE companies SET password = 'mccmrfip123' WHERE password = 'default123' OR password IS NULL OR password = ''`);
+    await dbPool.query(`UPDATE companies SET password = 'Mccmrfip@2025'`);
 
     // 5. Invoices Table
     await dbPool.query(`
@@ -609,12 +666,44 @@ async function initDb() {
       );
     `);
 
-    // Seed Roles if empty
-    const [rRows] = await dbPool.query(`SELECT COUNT(*) as count FROM roles`);
-    if (rRows[0].count === 0) {
-      for (const r of INITIAL_ROLES) {
-        await dbPool.query(`INSERT INTO roles (id, name, description) VALUES (?, ?, ?)`, [r.id, r.name, r.description]);
-      }
+    // 9. SMTP Settings Table (Single-Active Multi-Provider Configuration)
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS smtp_settings (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        provider VARCHAR(100) DEFAULT 'Custom SMTP Server',
+        host VARCHAR(255) NOT NULL,
+        port INT NOT NULL DEFAULT 587,
+        username VARCHAR(255),
+        password_encrypted TEXT,
+        auth_required TINYINT(1) DEFAULT 1,
+        use_tls TINYINT(1) DEFAULT 1,
+        use_ssl TINYINT(1) DEFAULT 0,
+        sender_email VARCHAR(255) NOT NULL,
+        is_active TINYINT(1) DEFAULT 0,
+        last_tested_at VARCHAR(100) DEFAULT NULL,
+        last_test_status VARCHAR(50) DEFAULT 'NOT_TESTED',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 10. Email Logs Table
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS email_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        recipient_email VARCHAR(255) NOT NULL,
+        email_type VARCHAR(100) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        failure_reason TEXT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed Roles if empty or missing
+    for (const r of INITIAL_ROLES) {
+      await dbPool.query(`INSERT IGNORE INTO roles (id, name, description) VALUES (?, ?, ?)`, [r.id, r.name, r.description]);
     }
 
     // Seed Permissions if empty
@@ -625,16 +714,21 @@ async function initDb() {
       }
     }
 
-    // Seed Role Permissions (Super Admin gets all 15, Admin gets view + restricted)
+    // Seed Role Permissions (Super Admin gets all 15, Admin gets view + create)
     const [rpRows] = await dbPool.query(`SELECT COUNT(*) as count FROM role_permissions`);
     if (rpRows[0].count === 0) {
       for (let pid = 1; pid <= 15; pid++) {
         await dbPool.query(`INSERT INTO role_permissions (role_id, permission_id) VALUES (1, ?)`, [pid]);
       }
-      const adminPerms = [1, 3, 5, 7, 8, 9]; // View company, update company (restricted), view payments, view/export reports, view places
+      const adminPerms = [1, 2, 3, 5, 7, 8, 9, 10]; // View/create/update company, view payments, view/export reports, view/create places
       for (const pid of adminPerms) {
         await dbPool.query(`INSERT INTO role_permissions (role_id, permission_id) VALUES (2, ?)`, [pid]);
       }
+    } else {
+      // Ensure company.create (2) and place.create (10) exist for Admin (role 2)
+      try {
+        await dbPool.query(`INSERT IGNORE INTO role_permissions (role_id, permission_id) VALUES (2, 2), (2, 10);`);
+      } catch (e) {}
     }
 
     // Seed Users if empty
@@ -648,15 +742,26 @@ async function initDb() {
       }
     }
 
-    // Seed Companies if empty
-    const [rows] = await dbPool.query(`SELECT COUNT(*) as count FROM companies`);
-    if (rows[0].count === 0) {
-      for (const comp of INITIAL_COMPANIES) {
-        await dbPool.query(
-          `INSERT INTO companies (id, s_no, contact_person, company_name, contact_number, email, password, interns_count, workers_count, monthly_rate, incubation_date, gst_number, place, business_description, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [comp.id, comp.s_no, comp.contact_person, comp.company_name, comp.contact_number, comp.email, comp.password, comp.interns_count, comp.workers_count, comp.monthly_rate, comp.incubation_date, comp.gst_number, comp.place, comp.business_description, comp.status]
-        );
+    // Seed / Sync Company User Accounts with default password Mccmrfip@2025
+    const companyPassHash = bcrypt.hashSync('Mccmrfip@2025', 10);
+    const [allDbCompanies] = await dbPool.query(`SELECT * FROM companies`);
+    for (const comp of allDbCompanies) {
+      try {
+        const [existingCompUsers] = await dbPool.query(`SELECT * FROM users WHERE company_id = ? OR LOWER(email) = LOWER(?)`, [comp.id, comp.email]);
+        if (existingCompUsers.length === 0) {
+          await dbPool.query(
+            `INSERT INTO users (company_id, name, email, username, password_hash, role_id, role, must_change_password, account_status, status)
+             VALUES (?, ?, ?, ?, ?, 3, 'COMPANY', 1, 'ACTIVE', 'Active')`,
+            [comp.id, comp.company_name, comp.email, comp.email, companyPassHash]
+          );
+        } else {
+          await dbPool.query(
+            `UPDATE users SET company_id = ?, password_hash = ?, must_change_password = 1, account_status = 'ACTIVE' WHERE id = ?`,
+            [comp.id, companyPassHash, existingCompUsers[0].id]
+          );
+        }
+      } catch (errSync) {
+        console.warn('Error syncing company user account:', errSync.message);
       }
     }
 
@@ -716,8 +821,11 @@ async function initDb() {
       }
     }
 
+    useInMemory = false;
+    lastDbError = null;
     console.log('MySQL Database mccmrf_rental enterprise schema initialized successfully.');
   } catch (err) {
+    lastDbError = err.message;
     console.warn('MySQL connection active fallback mode:', err.message);
     useInMemory = true;
   }
@@ -726,6 +834,41 @@ async function initDb() {
 initDb();
 
 const db = {
+  async getDbStatus() {
+    if (useInMemory) {
+      return {
+        connected: false,
+        mode: 'in-memory-fallback',
+        message: 'Running in fallback in-memory mode due to MySQL connection warning.',
+        error: lastDbError,
+        config: dbConnectionConfig
+      };
+    }
+    try {
+      await dbPool.query('SELECT 1 + 1 AS connection_test');
+      return {
+        connected: true,
+        mode: 'mysql',
+        message: `Connected to MySQL database (${dbConnectionConfig?.database})`,
+        error: null,
+        config: dbConnectionConfig
+      };
+    } catch (err) {
+      return {
+        connected: false,
+        mode: 'in-memory-fallback',
+        message: 'MySQL connection failed during query execution.',
+        error: err.message,
+        config: dbConnectionConfig
+      };
+    }
+  },
+
+  async retryConnection() {
+    await initDb();
+    return this.getDbStatus();
+  },
+
   // ==========================================
   // USERS, ROLES & AUTHENTICATION METHODS
   // ==========================================
@@ -1070,7 +1213,7 @@ const db = {
 
       const [res] = await dbPool.query(
         `INSERT INTO companies (s_no, contact_person, company_name, contact_number, email, password, interns_count, workers_count, monthly_rate, incubation_date, gst_number, place, business_description, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           nextSNo,
           companyData.contact_person,
@@ -1186,14 +1329,452 @@ const db = {
   async deleteCompany(id) {
     if (useInMemory) {
       inMemoryCompanies = inMemoryCompanies.filter((c) => Number(c.id) !== Number(id));
+      inMemoryUsers = inMemoryUsers.filter((u) => Number(u.company_id) !== Number(id));
       return true;
     }
     try {
+      await dbPool.query(`DELETE FROM users WHERE company_id = ?`, [id]);
       await dbPool.query(`DELETE FROM companies WHERE id = ?`, [id]);
       return true;
     } catch (err) {
       console.error('Error deleting company:', err);
       throw err;
+    }
+  },
+
+  // ==========================================
+  // SECURE COMPANY ACCOUNT CREATION TRANSACTION & AUTH METHODS
+  // ==========================================
+  async createCompanyWithAccountTx({ companyData, passwordHash }) {
+    if (useInMemory || !dbPool) {
+      const newCompanyId = inMemoryCompanies.length > 0 ? Math.max(...inMemoryCompanies.map((c) => c.id)) + 1 : 1;
+      const nextSNo = inMemoryCompanies.length > 0 ? Math.max(...inMemoryCompanies.map((c) => Number(c.s_no) || 0)) + 1 : 1;
+      const newCompany = {
+        id: newCompanyId,
+        s_no: nextSNo,
+        contact_person: companyData.contact_person || '',
+        company_name: companyData.company_name || '',
+        contact_number: companyData.contact_number || '',
+        email: companyData.email || '',
+        password: companyData.email,
+        interns_count: Number(companyData.interns_count || 0),
+        workers_count: Number(companyData.workers_count || 0),
+        monthly_rate: Number(companyData.monthly_rate || 0),
+        incubation_date: companyData.incubation_date || new Date().toISOString().split('T')[0],
+        gst_number: companyData.gst_number || '',
+        place: companyData.place || '',
+        business_description: companyData.business_description || '',
+        status: companyData.status || 'Approved'
+      };
+      inMemoryCompanies.push(newCompany);
+
+      const newUserId = inMemoryUsers.length > 0 ? Math.max(...inMemoryUsers.map((u) => u.id)) + 1 : 1;
+      const newUser = {
+        id: newUserId,
+        company_id: newCompanyId,
+        name: companyData.company_name || companyData.contact_person,
+        email: companyData.email,
+        username: companyData.email,
+        password_hash: passwordHash,
+        role_id: 3,
+        role_name: 'COMPANY',
+        role: 'COMPANY',
+        must_change_password: true,
+        account_status: 'ACTIVE',
+        status: 'Active',
+        created_at: new Date().toISOString()
+      };
+      inMemoryUsers.push(newUser);
+
+      return { company: newCompany, user: newUser };
+    }
+
+    const connection = await dbPool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [maxRows] = await connection.query(`SELECT MAX(s_no) as maxSNo FROM companies`);
+      const nextSNo = (maxRows[0].maxSNo || 0) + 1;
+
+      // 1. Insert into companies table
+      const [compRes] = await connection.query(
+        `INSERT INTO companies (s_no, contact_person, company_name, contact_number, email, password, interns_count, workers_count, monthly_rate, incubation_date, gst_number, place, business_description, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          nextSNo,
+          companyData.contact_person,
+          companyData.company_name,
+          companyData.contact_number,
+          companyData.email,
+          companyData.email, // placeholder, auth uses users table
+          Number(companyData.interns_count || 0),
+          Number(companyData.workers_count || 0),
+          Number(companyData.monthly_rate || 0),
+          companyData.incubation_date || new Date().toISOString().split('T')[0],
+          companyData.gst_number || '',
+          companyData.place || '',
+          companyData.business_description || '',
+          companyData.status || 'Approved'
+        ]
+      );
+      const companyId = compRes.insertId;
+
+      // 2. Insert into users table
+      const [userRes] = await connection.query(
+        `INSERT INTO users (company_id, name, email, username, password_hash, role_id, role, must_change_password, account_status, status)
+         VALUES (?, ?, ?, ?, ?, 3, 'COMPANY', 1, 'ACTIVE', 'Active')`,
+        [
+          companyId,
+          companyData.company_name,
+          companyData.email,
+          companyData.email,
+          passwordHash
+        ]
+      );
+
+      await connection.commit();
+      connection.release();
+
+      const createdCompany = await db.getCompanyById(companyId);
+      const createdUser = await db.getUserById(userRes.insertId);
+
+      return { company: createdCompany, user: createdUser };
+    } catch (err) {
+      await connection.rollback();
+      connection.release();
+      console.error('Error executing company account transaction:', err);
+      throw err;
+    }
+  },
+
+  async getCompanyUserByEmail(email) {
+    if (!email) return null;
+    const queryStr = email.trim().toLowerCase();
+
+    if (useInMemory || !dbPool) {
+      const user = inMemoryUsers.find(
+        (u) => u.email && u.email.toLowerCase() === queryStr
+      );
+      if (!user) return null;
+      const company = inMemoryCompanies.find((c) => Number(c.id) === Number(user.company_id)) || null;
+      return { ...user, company };
+    }
+
+    try {
+      const [rows] = await dbPool.query(
+        `SELECT u.*, c.company_name, c.contact_person, c.place, c.monthly_rate 
+         FROM users u 
+         LEFT JOIN companies c ON u.company_id = c.id OR LOWER(u.email) = LOWER(c.email)
+         WHERE LOWER(u.email) = ?`,
+        [queryStr]
+      );
+      return rows[0] || null;
+    } catch (err) {
+      const user = inMemoryUsers.find(
+        (u) => u.email && u.email.toLowerCase() === queryStr
+      );
+      if (!user) return null;
+      const company = inMemoryCompanies.find((c) => Number(c.id) === Number(user.company_id)) || null;
+      return { ...user, company };
+    }
+  },
+
+  async getCompanyUserByCompanyId(companyId) {
+    if (useInMemory || !dbPool) {
+      return inMemoryUsers.find((u) => Number(u.company_id) === Number(companyId)) || null;
+    }
+    try {
+      const [rows] = await dbPool.query(
+        `SELECT * FROM users WHERE company_id = ?`,
+        [companyId]
+      );
+      return rows[0] || null;
+    } catch (err) {
+      return inMemoryUsers.find((u) => Number(u.company_id) === Number(companyId)) || null;
+    }
+  },
+
+  async resetCompanyTemporaryPassword(companyId, passwordHash) {
+    if (useInMemory || !dbPool) {
+      const idx = inMemoryUsers.findIndex((u) => Number(u.company_id) === Number(companyId));
+      if (idx !== -1) {
+        inMemoryUsers[idx].password_hash = passwordHash;
+        inMemoryUsers[idx].must_change_password = true;
+        return inMemoryUsers[idx];
+      }
+      return null;
+    }
+    try {
+      await dbPool.query(
+        `UPDATE users SET password_hash = ?, must_change_password = 1 WHERE company_id = ?`,
+        [passwordHash, companyId]
+      );
+      return db.getCompanyUserByCompanyId(companyId);
+    } catch (err) {
+      console.error('Error resetting company temporary password:', err);
+      throw err;
+    }
+  },
+
+  async updateUserPasswordHash(userId, newPasswordHash, clearMustChange = true) {
+    if (useInMemory || !dbPool) {
+      const idx = inMemoryUsers.findIndex((u) => Number(u.id) === Number(userId));
+      if (idx !== -1) {
+        inMemoryUsers[idx].password_hash = newPasswordHash;
+        if (clearMustChange) inMemoryUsers[idx].must_change_password = false;
+        return inMemoryUsers[idx];
+      }
+      return null;
+    }
+    try {
+      const mustChangeVal = clearMustChange ? 0 : 1;
+      await dbPool.query(
+        `UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?`,
+        [newPasswordHash, mustChangeVal, userId]
+      );
+      return db.getUserById(userId);
+    } catch (err) {
+      console.error('Error updating user password hash:', err);
+      throw err;
+    }
+  },
+
+  async updateAccountStatus(companyId, accountStatus) {
+    if (useInMemory || !dbPool) {
+      const idx = inMemoryUsers.findIndex((u) => Number(u.company_id) === Number(companyId));
+      if (idx !== -1) {
+        inMemoryUsers[idx].account_status = accountStatus;
+        return inMemoryUsers[idx];
+      }
+      return null;
+    }
+    try {
+      await dbPool.query(
+        `UPDATE users SET account_status = ? WHERE company_id = ?`,
+        [accountStatus, companyId]
+      );
+      return db.getCompanyUserByCompanyId(companyId);
+    } catch (err) {
+      console.error('Error updating account status:', err);
+      throw err;
+    }
+  },
+
+  async getPaymentsByCompany(companyId) {
+    if (useInMemory || !dbPool) {
+      return inMemoryPayments.filter((p) => Number(p.company_id) === Number(companyId));
+    }
+    try {
+      const [rows] = await dbPool.query(
+        `SELECT * FROM payments WHERE company_id = ? ORDER BY id DESC`,
+        [companyId]
+      );
+      return rows || [];
+    } catch (err) {
+      return inMemoryPayments.filter((p) => Number(p.company_id) === Number(companyId));
+    }
+  },
+
+  inMemoryPayUSettings: {
+    id: 1,
+    gateway_name: 'PayU India',
+    status: 'ACTIVE',
+    environment: process.env.PAYU_ENVIRONMENT || 'test',
+    merchant_key: process.env.PAYU_MERCHANT_KEY || 'gtK2yq',
+    merchant_salt: process.env.PAYU_MERCHANT_SALT || 'eCwTwB0s',
+    allowed_methods: ['UPI', 'CARD']
+  },
+
+  async getPayUSetting() {
+    if (useInMemory || !dbPool) {
+      return this.inMemoryPayUSettings;
+    }
+    try {
+      const [rows] = await dbPool.query(`SELECT * FROM payment_gateway_settings WHERE gateway_name = 'PayU India' LIMIT 1`);
+      if (rows && rows.length > 0) {
+        return rows[0];
+      }
+      return this.inMemoryPayUSettings;
+    } catch (err) {
+      return this.inMemoryPayUSettings;
+    }
+  },
+
+  async savePayUSetting({ environment, merchantKey, merchantSalt, allowedMethods }) {
+    this.inMemoryPayUSettings = {
+      ...this.inMemoryPayUSettings,
+      environment: environment || 'test',
+      merchant_key: merchantKey || this.inMemoryPayUSettings.merchant_key,
+      merchant_salt: merchantSalt || this.inMemoryPayUSettings.merchant_salt,
+      allowed_methods: allowedMethods || ['UPI', 'CARD']
+    };
+
+    if (useInMemory || !dbPool) {
+      return this.inMemoryPayUSettings;
+    }
+
+    try {
+      await dbPool.query(
+        `INSERT INTO payment_gateway_settings (gateway_name, status, environment, merchant_key, merchant_salt, allowed_methods)
+         VALUES ('PayU India', 'ACTIVE', ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE environment = VALUES(environment), merchant_key = VALUES(merchant_key), merchant_salt = VALUES(merchant_salt), allowed_methods = VALUES(allowed_methods)`,
+        [environment || 'test', merchantKey, merchantSalt, JSON.stringify(allowedMethods || ['UPI', 'CARD'])]
+      );
+      return this.getPayUSetting();
+    } catch (err) {
+      console.warn('Error saving PayU setting to DB, updated in-memory:', err.message);
+      return this.inMemoryPayUSettings;
+    }
+  },
+
+  async createPayUPaymentTx({ companyId, invoiceId, transactionId, amount, monthYear, customerName, customerEmail }) {
+    const newTxn = {
+      id: inMemoryPayments.length + 1,
+      company_id: companyId,
+      invoice_id: invoiceId || null,
+      transaction_id: transactionId,
+      payment_gateway: 'PAYU',
+      payu_transaction_id: transactionId,
+      payu_payment_id: null,
+      amount: amount,
+      currency: 'INR',
+      month_year: monthYear,
+      customer_name: customerName,
+      customer_email: customerEmail,
+      payment_method: 'PayU (UPI / Card)',
+      payment_status: 'PENDING',
+      payment_date: null,
+      created_at: new Date().toISOString()
+    };
+    inMemoryPayments.unshift(newTxn);
+
+    if (useInMemory || !dbPool) {
+      return newTxn;
+    }
+
+    try {
+      const [res] = await dbPool.query(
+        `INSERT INTO payments (company_id, invoice_id, transaction_id, payment_gateway, payu_transaction_id, amount, currency, month_year, customer_name, customer_email, payment_method, payment_status, created_at)
+         VALUES (?, ?, ?, 'PAYU', ?, ?, 'INR', ?, ?, ?, 'PayU (UPI / Card)', 'PENDING', NOW())`,
+        [companyId, invoiceId || null, transactionId, transactionId, amount, monthYear, customerName, customerEmail]
+      );
+      return { id: res.insertId, ...newTxn };
+    } catch (err) {
+      console.warn('Error creating PayU payment in DB, created in-memory:', err.message);
+      return newTxn;
+    }
+  },
+
+  async updatePayUPaymentStatus(transactionId, { status, payuPaymentId, paymentMethod, failureReason }) {
+    const pIndex = inMemoryPayments.findIndex((p) => p.transaction_id === transactionId || p.payu_transaction_id === transactionId);
+    if (pIndex !== -1) {
+      inMemoryPayments[pIndex] = {
+        ...inMemoryPayments[pIndex],
+        payment_status: status,
+        payu_payment_id: payuPaymentId || inMemoryPayments[pIndex].payu_payment_id,
+        payment_method: paymentMethod || inMemoryPayments[pIndex].payment_method,
+        failure_reason: failureReason || null,
+        payment_date: status === 'PAID' ? new Date().toISOString() : inMemoryPayments[pIndex].payment_date
+      };
+    }
+
+    if (useInMemory || !dbPool) {
+      return inMemoryPayments[pIndex] || null;
+    }
+
+    try {
+      await dbPool.query(
+        `UPDATE payments SET payment_status = ?, payu_payment_id = ?, payment_method = ?, failure_reason = ?, payment_date = IF(? = 'PAID', NOW(), payment_date), updated_at = NOW()
+         WHERE transaction_id = ? OR payu_transaction_id = ?`,
+        [status, payuPaymentId || null, paymentMethod || 'PayU', failureReason || null, status, transactionId, transactionId]
+      );
+      const [rows] = await dbPool.query(`SELECT * FROM payments WHERE transaction_id = ? OR payu_transaction_id = ? LIMIT 1`, [transactionId, transactionId]);
+      return rows && rows.length > 0 ? rows[0] : (inMemoryPayments[pIndex] || null);
+    } catch (err) {
+      console.warn('Error updating PayU payment status in DB:', err.message);
+      return inMemoryPayments[pIndex] || null;
+    }
+  },
+
+  async getPaymentByTxnId(transactionId) {
+    if (useInMemory || !dbPool) {
+      return inMemoryPayments.find((p) => p.transaction_id === transactionId || p.payu_transaction_id === transactionId) || null;
+    }
+    try {
+      const [rows] = await dbPool.query(`SELECT * FROM payments WHERE transaction_id = ? OR payu_transaction_id = ? LIMIT 1`, [transactionId, transactionId]);
+      return rows && rows.length > 0 ? rows[0] : (inMemoryPayments.find((p) => p.transaction_id === transactionId || p.payu_transaction_id === transactionId) || null);
+    } catch (err) {
+      return inMemoryPayments.find((p) => p.transaction_id === transactionId || p.payu_transaction_id === transactionId) || null;
+    }
+  },
+
+  async logEmail({ recipientEmail, emailType, subject, status, failureReason }) {
+    if (useInMemory || !dbPool) {
+      const newLog = {
+        id: inMemoryEmailLogs.length + 1,
+        recipient_email: recipientEmail,
+        email_type: emailType || 'COMPANY_CREDENTIALS',
+        subject: subject,
+        status: status,
+        sent_at: new Date().toISOString(),
+        failure_reason: failureReason || null
+      };
+      inMemoryEmailLogs.push(newLog);
+      return newLog;
+    }
+    try {
+      const [res] = await dbPool.query(
+        `INSERT INTO email_logs (recipient_email, email_type, subject, status, failure_reason)
+         VALUES (?, ?, ?, ?, ?)`,
+        [recipientEmail, emailType || 'COMPANY_CREDENTIALS', subject, status, failureReason || null]
+      );
+      return { id: res.insertId, recipient_email: recipientEmail, status };
+    } catch (err) {
+      console.error('Error writing email log:', err);
+    }
+  },
+
+  async getCompaniesWithUsers() {
+    if (useInMemory || !dbPool) {
+      return inMemoryCompanies.map((c) => {
+        const u = inMemoryUsers.find((user) => Number(user.company_id) === Number(c.id) || (user.email && user.email.toLowerCase() === c.email.toLowerCase()));
+        let login_status = 'Active';
+        if (u) {
+          if (u.account_status === 'INACTIVE' || u.account_status === 'SUSPENDED') {
+            login_status = 'Inactive';
+          } else if (u.must_change_password) {
+            login_status = 'Password Change Required';
+          } else {
+            login_status = 'Active';
+          }
+        }
+        return {
+          ...c,
+          must_change_password: u ? Boolean(u.must_change_password) : true,
+          account_status: u ? (u.account_status || 'ACTIVE') : 'ACTIVE',
+          login_status
+        };
+      }).sort((a, b) => (Number(a.s_no) || 0) - (Number(b.s_no) || 0));
+    }
+
+    try {
+      const [rows] = await dbPool.query(
+        `SELECT c.*, 
+                COALESCE(u.account_status, 'ACTIVE') as account_status,
+                COALESCE(u.must_change_password, 1) as must_change_password,
+                CASE 
+                  WHEN u.account_status = 'INACTIVE' OR u.account_status = 'SUSPENDED' THEN 'Inactive'
+                  WHEN u.must_change_password = 1 THEN 'Password Change Required'
+                  ELSE 'Active'
+                END as login_status
+         FROM companies c
+         LEFT JOIN users u ON c.id = u.company_id OR LOWER(c.email) = LOWER(u.email)
+         ORDER BY c.s_no ASC, c.id ASC`
+      );
+      return rows;
+    } catch (err) {
+      const comps = await db.getCompanies();
+      return comps.map((c) => ({ ...c, login_status: 'Password Change Required', must_change_password: true, account_status: 'ACTIVE' }));
     }
   },
 
@@ -1858,6 +2439,212 @@ const db = {
       return rows;
     } catch (err) {
       return [...inMemoryAuditLogs];
+    }
+  },
+
+  // ==========================================
+  // SMTP SETTINGS (SINGLE-ACTIVE MULTI-PROVIDER)
+  // ==========================================
+  async getSmtpSettings() {
+    if (useInMemory) return inMemorySmtpSettings;
+    try {
+      const [rows] = await dbPool.query(`SELECT * FROM smtp_settings ORDER BY is_active DESC, id DESC`);
+      return rows;
+    } catch (err) {
+      return inMemorySmtpSettings;
+    }
+  },
+
+  async getSmtpSettingById(id) {
+    if (useInMemory) return inMemorySmtpSettings.find((s) => Number(s.id) === Number(id)) || null;
+    try {
+      const [rows] = await dbPool.query(`SELECT * FROM smtp_settings WHERE id = ?`, [id]);
+      return rows[0] || null;
+    } catch (err) {
+      return inMemorySmtpSettings.find((s) => Number(s.id) === Number(id)) || null;
+    }
+  },
+
+  async getActiveSmtpSetting() {
+    if (useInMemory) return inMemorySmtpSettings.find((s) => s.is_active === 1 || s.is_active === true) || null;
+    try {
+      const [rows] = await dbPool.query(`SELECT * FROM smtp_settings WHERE is_active = 1 LIMIT 1`);
+      return rows[0] || null;
+    } catch (err) {
+      return inMemorySmtpSettings.find((s) => s.is_active === 1 || s.is_active === true) || null;
+    }
+  },
+
+  async createSmtpSetting(settingData) {
+    const isActive = settingData.is_active === true || settingData.is_active === 1 || settingData.is_active === '1';
+
+    if (useInMemory) {
+      if (isActive) {
+        inMemorySmtpSettings.forEach((s) => s.is_active = 0);
+      }
+      const newId = inMemorySmtpSettings.length > 0 ? Math.max(...inMemorySmtpSettings.map((s) => s.id)) + 1 : 1;
+      const record = {
+        id: newId,
+        provider: settingData.provider || 'Custom SMTP Server',
+        host: settingData.host,
+        port: Number(settingData.port || 587),
+        username: settingData.username || '',
+        password_encrypted: settingData.password_encrypted || '',
+        auth_required: settingData.auth_required !== false ? 1 : 0,
+        use_tls: settingData.use_tls !== false ? 1 : 0,
+        use_ssl: settingData.use_ssl ? 1 : 0,
+        sender_email: settingData.sender_email,
+        is_active: isActive ? 1 : 0,
+        last_tested_at: null,
+        last_test_status: 'NOT_TESTED',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      inMemorySmtpSettings.unshift(record);
+      return record;
+    }
+
+    try {
+      // Single-Active Constraint: Deactivate all others if current configuration is active
+      if (isActive) {
+        await dbPool.query(`UPDATE smtp_settings SET is_active = 0`);
+      }
+
+      const [res] = await dbPool.query(
+        `INSERT INTO smtp_settings (provider, host, port, username, password_encrypted, auth_required, use_tls, use_ssl, sender_email, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          settingData.provider || 'Custom SMTP Server',
+          settingData.host,
+          Number(settingData.port || 587),
+          settingData.username || '',
+          settingData.password_encrypted || '',
+          settingData.auth_required !== false ? 1 : 0,
+          settingData.use_tls !== false ? 1 : 0,
+          settingData.use_ssl ? 1 : 0,
+          settingData.sender_email,
+          isActive ? 1 : 0
+        ]
+      );
+
+      return db.getSmtpSettingById(res.insertId);
+    } catch (err) {
+      console.error('Error creating SMTP setting:', err);
+      throw err;
+    }
+  },
+
+  async updateSmtpSetting(id, settingData) {
+    const isActive = settingData.is_active === true || settingData.is_active === 1 || settingData.is_active === '1';
+
+    if (useInMemory) {
+      if (isActive) {
+        inMemorySmtpSettings.forEach((s) => {
+          if (Number(s.id) !== Number(id)) s.is_active = 0;
+        });
+      }
+      const idx = inMemorySmtpSettings.findIndex((s) => Number(s.id) === Number(id));
+      if (idx !== -1) {
+        inMemorySmtpSettings[idx] = {
+          ...inMemorySmtpSettings[idx],
+          ...settingData,
+          is_active: settingData.is_active !== undefined ? (isActive ? 1 : 0) : inMemorySmtpSettings[idx].is_active,
+          updated_at: new Date().toISOString()
+        };
+        return inMemorySmtpSettings[idx];
+      }
+      return null;
+    }
+
+    try {
+      // Single-Active Constraint: Deactivate all others if updating to active
+      if (isActive) {
+        await dbPool.query(`UPDATE smtp_settings SET is_active = 0 WHERE id != ?`, [id]);
+      }
+
+      const fields = [];
+      const params = [];
+
+      if (settingData.provider !== undefined) { fields.push('provider = ?'); params.push(settingData.provider); }
+      if (settingData.host !== undefined) { fields.push('host = ?'); params.push(settingData.host); }
+      if (settingData.port !== undefined) { fields.push('port = ?'); params.push(Number(settingData.port)); }
+      if (settingData.username !== undefined) { fields.push('username = ?'); params.push(settingData.username); }
+      if (settingData.password_encrypted !== undefined && settingData.password_encrypted !== '') {
+        fields.push('password_encrypted = ?'); params.push(settingData.password_encrypted);
+      }
+      if (settingData.auth_required !== undefined) { fields.push('auth_required = ?'); params.push(settingData.auth_required ? 1 : 0); }
+      if (settingData.use_tls !== undefined) { fields.push('use_tls = ?'); params.push(settingData.use_tls ? 1 : 0); }
+      if (settingData.use_ssl !== undefined) { fields.push('use_ssl = ?'); params.push(settingData.use_ssl ? 1 : 0); }
+      if (settingData.sender_email !== undefined) { fields.push('sender_email = ?'); params.push(settingData.sender_email); }
+      if (settingData.is_active !== undefined) { fields.push('is_active = ?'); params.push(isActive ? 1 : 0); }
+
+      if (fields.length > 0) {
+        params.push(id);
+        await dbPool.query(`UPDATE smtp_settings SET ${fields.join(', ')} WHERE id = ?`, params);
+      }
+
+      return db.getSmtpSettingById(id);
+    } catch (err) {
+      console.error('Error updating SMTP setting:', err);
+      throw err;
+    }
+  },
+
+  async setActiveSmtpSetting(id, isActive) {
+    if (useInMemory) {
+      inMemorySmtpSettings.forEach((s) => {
+        if (Number(s.id) === Number(id)) {
+          s.is_active = isActive ? 1 : 0;
+        } else if (isActive) {
+          s.is_active = 0;
+        }
+      });
+      return db.getSmtpSettingById(id);
+    }
+
+    try {
+      if (isActive) {
+        await dbPool.query(`UPDATE smtp_settings SET is_active = 0`);
+        await dbPool.query(`UPDATE smtp_settings SET is_active = 1 WHERE id = ?`, [id]);
+      } else {
+        await dbPool.query(`UPDATE smtp_settings SET is_active = 0 WHERE id = ?`, [id]);
+      }
+      return db.getSmtpSettingById(id);
+    } catch (err) {
+      console.error('Error setting active SMTP setting:', err);
+      throw err;
+    }
+  },
+
+  async deleteSmtpSetting(id) {
+    if (useInMemory) {
+      inMemorySmtpSettings = inMemorySmtpSettings.filter((s) => Number(s.id) !== Number(id));
+      return true;
+    }
+    try {
+      await dbPool.query(`DELETE FROM smtp_settings WHERE id = ?`, [id]);
+      return true;
+    } catch (err) {
+      console.error('Error deleting SMTP setting:', err);
+      throw err;
+    }
+  },
+
+  async updateSmtpTestStatus(id, testStatus) {
+    const timestamp = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+    if (useInMemory) {
+      const idx = inMemorySmtpSettings.findIndex((s) => Number(s.id) === Number(id));
+      if (idx !== -1) {
+        inMemorySmtpSettings[idx].last_tested_at = timestamp;
+        inMemorySmtpSettings[idx].last_test_status = testStatus;
+      }
+      return inMemorySmtpSettings[idx] || null;
+    }
+    try {
+      await dbPool.query(`UPDATE smtp_settings SET last_tested_at = ?, last_test_status = ? WHERE id = ?`, [timestamp, testStatus, id]);
+      return db.getSmtpSettingById(id);
+    } catch (err) {
+      console.error('Error updating SMTP test status:', err);
     }
   }
 };

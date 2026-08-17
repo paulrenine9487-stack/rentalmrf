@@ -197,12 +197,12 @@ export default function InvoiceReceiptModal({ receiptData, onClose }) {
                 Transaction Summary
               </h4>
               <div style={{ fontSize: '0.84rem', color: '#4B5563', marginBottom: '0.35rem', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Razorpay Payment ID:</span>
-                <strong style={{ color: '#1F2937' }}>{receiptData.payment_id || 'pay_verified_2026'}</strong>
+                <span>PayU Transaction ID:</span>
+                <strong style={{ color: '#1F2937' }}>{receiptData.payment_id || 'MRF-INV-2026-00001'}</strong>
               </div>
               <div style={{ fontSize: '0.84rem', color: '#4B5563', marginBottom: '0.35rem', display: 'flex', justifyContent: 'space-between' }}>
-                <span>Payment Method:</span>
-                <strong style={{ color: '#1F2937' }}>{receiptData.payment_method || 'Razorpay Standard Checkout'}</strong>
+                <span>Payment Gateway / Method:</span>
+                <strong style={{ color: '#1F2937' }}>{receiptData.payment_method || 'PayU India (UPI / Card)'}</strong>
               </div>
               <div style={{ fontSize: '0.84rem', color: '#4B5563', marginBottom: '0.35rem', display: 'flex', justifyContent: 'space-between' }}>
                 <span>Billing Period:</span>
