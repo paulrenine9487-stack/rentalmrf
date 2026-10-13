@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Users, Plus, Edit2, Trash2, Key, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function AccessControlPage() {
   const [activeTab, setActiveTab] = useState('users');
@@ -35,9 +36,9 @@ export default function AccessControlPage() {
 
     try {
       const [usersRes, rolesRes, permsRes] = await Promise.all([
-        fetch('http://localhost:5000/api/users', { headers }),
-        fetch('http://localhost:5000/api/roles', { headers }),
-        fetch('http://localhost:5000/api/permissions', { headers })
+        fetch(`${API_BASE_URL}/api/users`, { headers }),
+        fetch(`${API_BASE_URL}/api/roles`, { headers }),
+        fetch(`${API_BASE_URL}/api/permissions`, { headers })
       ]);
 
       const uData = await usersRes.json();
@@ -59,7 +60,7 @@ export default function AccessControlPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch('http://localhost:5000/api/users', {
+      const res = await fetch(`${API_BASE_URL}/api/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -90,7 +91,7 @@ export default function AccessControlPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${selectedUser.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/users/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ export default function AccessControlPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/users/${selectedUser.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/users/${selectedUser.id}`, {
         method: 'DELETE',
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });

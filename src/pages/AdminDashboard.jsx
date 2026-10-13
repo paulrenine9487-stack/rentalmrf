@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Shield, Server, UserCheck, Activity } from 'lucide-react';
+import { API_BASE_URL } from '../utils/apiConfig';
 import './AdminDashboard.css';
 
 export default function AdminDashboard() {
@@ -10,8 +11,8 @@ export default function AdminDashboard() {
     () => sessionStorage.getItem('adminRole') || 'admin'
   );
 
-  const [adminUsername, setAdminUsername] = useState('MCCMRFIP@admin');
-  const [adminPassword, setAdminPassword] = useState('Novara2024');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
   const [activeTab, setActiveTab] = useState('companies');
@@ -41,7 +42,7 @@ export default function AdminDashboard() {
 
   const fetchPlaces = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/places');
+      const res = await fetch(`${API_BASE_URL}/api/places`);
       const data = await res.json();
       if (data.success && Array.isArray(data.places)) {
         setPlaces(data.places);
@@ -79,8 +80,8 @@ export default function AdminDashboard() {
     e.preventDefault();
     try {
       const url = editingPlace
-        ? `http://localhost:5000/api/places/${editingPlace.id}`
-        : 'http://localhost:5000/api/places';
+        ? `${API_BASE_URL}/api/places/${editingPlace.id}`
+        : `${API_BASE_URL}/api/places`;
       const method = editingPlace ? 'PUT' : 'POST';
 
       const token = sessionStorage.getItem('adminToken');
@@ -113,7 +114,7 @@ export default function AdminDashboard() {
     if (window.confirm(`Are you sure you want to delete workspace "${place.name}"?`)) {
       try {
         const token = sessionStorage.getItem('adminToken');
-        const res = await fetch(`http://localhost:5000/api/places/${place.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/places/${place.id}`, {
           method: 'DELETE',
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
@@ -134,7 +135,7 @@ export default function AdminDashboard() {
   // Fetch Razorpay payments list for Admin
   const fetchRazorpayPayments = async () => {
     try {
-      const url = `http://localhost:5000/api/admin/payments-list?status=${encodeURIComponent(rzpStatusFilter)}&search=${encodeURIComponent(rzpSearchQuery)}`;
+      const url = `${API_BASE_URL}/api/admin/payments-list?status=${encodeURIComponent(rzpStatusFilter)}&search=${encodeURIComponent(rzpSearchQuery)}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.success && Array.isArray(data.payments)) {
@@ -171,7 +172,7 @@ export default function AdminDashboard() {
   const fetchCompanies = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/companies');
+      const res = await fetch(`${API_BASE_URL}/api/companies`);
       const data = await res.json();
       if (data.success && Array.isArray(data.companies)) {
         const sorted = [...data.companies].sort(
@@ -189,8 +190,8 @@ export default function AdminDashboard() {
     try {
       const url =
         companyFilter && companyFilter !== 'All Companies'
-          ? `http://localhost:5000/api/admin/payments?company_name=${encodeURIComponent(companyFilter)}`
-          : 'http://localhost:5000/api/admin/payments';
+          ? `${API_BASE_URL}/api/admin/payments?company_name=${encodeURIComponent(companyFilter)}`
+          : `${API_BASE_URL}/api/admin/payments`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.success && Array.isArray(data.payments)) {
@@ -203,7 +204,7 @@ export default function AdminDashboard() {
 
   const fetchAdminReports = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/reports');
+      const res = await fetch(`${API_BASE_URL}/api/admin/reports`);
       const data = await res.json();
       if (data.success && data.reports) {
         setReportsData(data.reports);
@@ -234,7 +235,7 @@ export default function AdminDashboard() {
     setLoginError('');
 
     try {
-      const res = await fetch('http://localhost:5000/api/admin/login', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: adminUsername, password: adminPassword })
@@ -315,7 +316,7 @@ export default function AdminDashboard() {
   const handleDeleteCompany = async (comp) => {
     if (window.confirm(`Are you sure you want to delete "${comp.company_name}" from the database?`)) {
       try {
-        const res = await fetch(`http://localhost:5000/api/companies/${comp.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/companies/${comp.id}`, {
           method: 'DELETE'
         });
         const data = await res.json();
@@ -336,7 +337,7 @@ export default function AdminDashboard() {
   const handleViewPayments = async (comp) => {
     setSelectedCompanyName(comp.company_name);
     try {
-      const res = await fetch(`http://localhost:5000/api/company/${comp.id}`);
+      const res = await fetch(`${API_BASE_URL}/api/company/${comp.id}`);
       const data = await res.json();
       if (data.success) {
         setSelectedCompanyPayments(data.payments || []);
@@ -360,8 +361,8 @@ export default function AdminDashboard() {
     e.preventDefault();
     try {
       const url = editingCompany
-        ? `http://localhost:5000/api/companies/${editingCompany.id}`
-        : 'http://localhost:5000/api/companies';
+        ? `${API_BASE_URL}/api/companies/${editingCompany.id}`
+        : `${API_BASE_URL}/api/companies`;
       const method = editingCompany ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -429,7 +430,7 @@ export default function AdminDashboard() {
                   className="form-input"
                   value={adminUsername}
                   onChange={(e) => setAdminUsername(e.target.value)}
-                  placeholder="MCCMRFIP@admin or MCCMRFIP@super"
+                  placeholder="Enter username or email"
                   required
                 />
               </div>
@@ -444,7 +445,7 @@ export default function AdminDashboard() {
                   className="form-input"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  placeholder="Novara2024 or super2024"
+                  placeholder="Enter password"
                   required
                 />
               </div>
@@ -829,7 +830,7 @@ export default function AdminDashboard() {
                       <td>
                         <span
                           className={
-                            txn.status === 'Completed' ? 'badge-completed' : 'badge-pending'
+                            txn.status === 'Completed' || txn.status === 'Paid' || txn.status === 'PAID' ? 'badge-completed' : 'badge-pending'
                           }
                         >
                           {txn.status}
@@ -1156,8 +1157,8 @@ export default function AdminDashboard() {
                     <span
                       className="status-badge"
                       style={{
-                        backgroundColor: p.status === 'Paid' ? '#28a745' : '#FFC107',
-                        color: p.status === 'Paid' ? '#FFFFFF' : '#000000',
+                        backgroundColor: (p.status === 'Paid' || p.status === 'Completed' || p.status === 'PAID') ? '#28a745' : '#FFC107',
+                        color: (p.status === 'Paid' || p.status === 'Completed' || p.status === 'PAID') ? '#FFFFFF' : '#000000',
                         padding: '0.2rem 0.6rem',
                         borderRadius: '10px',
                         fontSize: '0.8rem',
@@ -1170,6 +1171,9 @@ export default function AdminDashboard() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
       {/* ADD / EDIT PLACE MODAL */}
       {showPlaceModal && (
         <div className="admin-modal-overlay">

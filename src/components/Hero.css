@@ -24,10 +24,11 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  max-width: 860px;
+  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   background: transparent;
-  padding: 0;
+  padding: 0 1rem;
   border-radius: 0;
   box-shadow: none;
   border: none;
@@ -50,18 +51,20 @@
 }
 
 .hero-title {
-  font-size: 3.35rem;
+  font-size: clamp(2rem, 3.4vw, 3.25rem);
   font-weight: 900;
   color: #FFFFFF;
   line-height: 1.2;
   letter-spacing: -0.02em;
   margin-bottom: 1.25rem;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
 }
 
 .highlight-text {
   color: #800000;
   text-shadow: 0 2px 10px rgba(255, 255, 255, 0.95), 0 0 3px #FFFFFF;
+  white-space: nowrap;
 }
 
 .hero-subtitle {
@@ -160,7 +163,12 @@
 /* Tablet responsiveness */
 @media (max-width: 992px) {
   .hero-title {
-    font-size: 2.6rem;
+    font-size: clamp(1.8rem, 3.8vw, 2.5rem);
+    white-space: normal;
+  }
+
+  .highlight-text {
+    white-space: nowrap;
   }
 
   .hero-subtitle {
@@ -185,13 +193,18 @@
   }
 
   .hero-content {
-    padding: 2rem 1.5rem;
+    padding: 2rem 1rem;
     align-items: center;
     text-align: center;
   }
 
   .hero-title {
-    font-size: 2.2rem;
+    font-size: clamp(1.35rem, 5vw, 1.95rem);
+    white-space: normal;
+  }
+
+  .highlight-text {
+    white-space: nowrap;
   }
 
   .hero-subtitle {
@@ -205,12 +218,18 @@
 
 @media (max-width: 480px) {
   .hero-title {
-    font-size: 1.8rem;
+    font-size: clamp(1.15rem, 5.5vw, 1.5rem);
+    white-space: normal;
+    word-break: break-word;
+  }
+  .highlight-text {
+    white-space: normal;
+    word-break: break-word;
   }
   .hero-content {
-    padding: 1.75rem 1.25rem;
+    padding: 1.5rem 0.5rem;
   }
   .hero-svg-wrapper {
-    max-width: 260px;
+    max-width: 240px;
   }
 }

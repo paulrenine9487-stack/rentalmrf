@@ -602,9 +602,46 @@
 }
 
 /* RESPONSIVE DESIGN BREAKPOINTS */
+.admin-analytics-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.admin-dual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.admin-quad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 @media (max-width: 1200px) {
   .admin-stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-quad-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .admin-analytics-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .admin-dual-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
 }
 
@@ -629,25 +666,85 @@
     grid-template-columns: 1fr;
   }
 
+  .admin-quad-grid {
+    grid-template-columns: 1fr;
+  }
+
   .admin-content {
-    padding: 1.25rem 1rem;
+    padding: 1rem 0.85rem;
   }
 
   .admin-header {
-    padding: 0 1rem;
+    padding: 0 0.85rem;
+  }
+
+  .admin-header-title {
+    font-size: 1.05rem;
+  }
+
+  .admin-user-info {
+    display: none;
   }
 
   .admin-table-toolbar {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.75rem;
   }
 
   .admin-search-box {
     max-width: 100%;
+    width: 100%;
   }
 
   .admin-filter-group {
     flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .admin-filter-group select,
+  .admin-select-input {
+    width: 100% !important;
+  }
+
+  /* Modal Responsiveness */
+  .admin-modal-overlay {
+    padding: 0.65rem;
+  }
+
+  .admin-modal-card {
+    padding: 1.25rem 1rem;
+    border-radius: 12px;
+    max-height: 92vh;
+  }
+
+  .modal-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .form-group.full-width {
+    grid-column: span 1;
+  }
+
+  .form-actions-row {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .cancel-btn,
+  .add-company-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .smtp-tabs-bar {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

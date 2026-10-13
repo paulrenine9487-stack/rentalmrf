@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MCC MRF Innovation Park - Incubation Portal. Empowering Innovation, Nurturing Growth." />
     <title>MCC MRF Innovation Park — Incubation Portal</title>
+    <script>
+      if (typeof Object.hasOwn !== 'function') {
+        Object.hasOwn = function (object, property) {
+          if (object == null) {
+            throw new TypeError('Cannot convert undefined or null to object');
+          }
+          return Object.prototype.hasOwnProperty.call(Object(object), property);
+        };
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

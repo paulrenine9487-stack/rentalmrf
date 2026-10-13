@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Lock, ArrowRight, CheckCircle2, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { API_BASE_URL } from '../utils/apiConfig';
 import './Login.css';
 
 const PRESEEDED_COMPANIES = [
@@ -139,7 +140,7 @@ export default function Login() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: loginEmail, password: loginPassword })
@@ -185,7 +186,7 @@ export default function Login() {
           if (comp && comp.email && comp.email.toLowerCase() === loginEmail.toLowerCase()) {
             matchedCompany = comp;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // 2. Check preseeded list if not matched in localStorage
@@ -220,10 +221,18 @@ export default function Login() {
       const expectedPassword = customPassword || matchedCompany.password || 'Mccmrfip@2025';
 
       if (loginPassword === expectedPassword) {
-        const finalCompany = { ...matchedCompany, password: expectedPassword };
+        const finalCompany = {
+          ...matchedCompany,
+          password: expectedPassword,
+          must_change_password: customPassword ? false : (matchedCompany.must_change_password || false)
+        };
         localStorage.setItem('currentCompany', JSON.stringify(finalCompany));
         setLoading(false);
-        navigate('/dashboard');
+        if (finalCompany.must_change_password) {
+          navigate('/change-password');
+        } else {
+          navigate('/dashboard');
+        }
       } else {
         setLoading(false);
         setErrorMsg('Invalid Email or Password. Please check credentials.');
@@ -258,7 +267,7 @@ export default function Login() {
     setForgotSubmitting(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/user/change-password', {
+      const res = await fetch(`${API_BASE_URL}/api/user/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -285,7 +294,7 @@ export default function Login() {
               comp.password = forgotNewPassword;
               localStorage.setItem('currentCompany', JSON.stringify(comp));
             }
-          } catch (err) {}
+          } catch (err) { }
         }
 
         const map = JSON.parse(localStorage.getItem('company_passwords_map') || '{}');
@@ -309,7 +318,7 @@ export default function Login() {
           const comp = JSON.parse(stored);
           comp.password = forgotNewPassword;
           localStorage.setItem('currentCompany', JSON.stringify(comp));
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const map = JSON.parse(localStorage.getItem('company_passwords_map') || '{}');

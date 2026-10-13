@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, KeyRound, ShieldCheck, ArrowRight, UserCheck, Sparkles } from 'lucide-react';
 import { evaluatePasswordStrength } from '../utils/passwordGenerator';
+import { API_BASE_URL } from '../utils/apiConfig';
 import './ChangePassword.css';
 
 export default function ChangePasswordPage() {
@@ -66,7 +67,7 @@ export default function ChangePasswordPage() {
 
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('companyToken');
-      const res = await fetch('http://localhost:5000/api/auth/change-password', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,14 +87,26 @@ export default function ChangePasswordPage() {
       if (data.success) {
         setAlertMsg({ type: 'success', text: 'Password updated successfully! Redirecting to company dashboard...' });
         
+        if (userEmail) {
+          try {
+            const passMap = JSON.parse(localStorage.getItem('company_passwords_map') || '{}');
+            passMap[userEmail.toLowerCase()] = newPassword;
+            localStorage.setItem('company_passwords_map', JSON.stringify(passMap));
+          } catch (e) {}
+        }
+
         if (data.token) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('companyToken', data.token);
         }
-        if (data.company || data.user) {
-          localStorage.setItem('currentCompany', JSON.stringify(data.company || data.user));
-          localStorage.setItem('currentUser', JSON.stringify(data.user || data.company));
-        }
+        
+        const updatedComp = {
+          ...(data.company || data.user || {}),
+          password: newPassword,
+          must_change_password: false
+        };
+        localStorage.setItem('currentCompany', JSON.stringify(updatedComp));
+        localStorage.setItem('currentUser', JSON.stringify(updatedComp));
 
         setTimeout(() => {
           navigate('/dashboard');

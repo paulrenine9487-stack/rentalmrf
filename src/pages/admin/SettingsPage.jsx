@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings as SettingsIcon,
   ShieldCheck,
   Lock,
-  User,
   CheckCircle2,
   AlertTriangle,
   Mail,
@@ -12,17 +10,16 @@ import {
   EyeOff,
   Send,
   RefreshCw,
-  Power,
   Edit3,
   Trash2,
   Plus,
   X,
   Check,
-  AlertCircle,
-  Clock,
-  Sparkles
+  CreditCard,
+  Key
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 const PRESET_PROVIDERS = [
   {
@@ -127,9 +124,13 @@ export default function SettingsPage() {
 
   // PayU Payment Gateway State
   const [payuEnv, setPayuEnv] = useState('test');
-  const [payuKey, setPayuKey] = useState('gtK2yq');
-  const [payuSalt, setPayuSalt] = useState('eCwTwB0s');
+  const [payuKey, setPayuKey] = useState('7kml0E');
+  const [payuSalt, setPayuSalt] = useState('RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx');
+  const [showPayuKey, setShowPayuKey] = useState(false);
+  const [showPayuSalt, setShowPayuSalt] = useState(false);
   const [savingPayu, setSavingPayu] = useState(false);
+  const [testingPayu, setTestingPayu] = useState(false);
+  const [payuTestResult, setPayuTestResult] = useState(null);
 
   useEffect(() => {
     const u = localStorage.getItem('adminUser') || sessionStorage.getItem('adminUser');
@@ -149,13 +150,14 @@ export default function SettingsPage() {
   const fetchPayUSettings = async () => {
     try {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const res = await fetch('http://localhost:5000/api/admin/settings/payment-gateway', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/settings/payment-gateway`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.success && data.paymentGateway) {
         setPayuEnv(data.paymentGateway.environment || 'test');
-        setPayuKey(data.paymentGateway.merchant_key || 'gtK2yq');
+        setPayuKey(data.paymentGateway.merchant_key || '7kml0E');
+        setPayuSalt(data.paymentGateway.merchant_salt || 'RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx');
       }
     } catch (e) {
       console.warn('Error fetching PayU settings:', e);
@@ -167,7 +169,7 @@ export default function SettingsPage() {
     setSavingPayu(true);
     try {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const res = await fetch('http://localhost:5000/api/admin/settings/payment-gateway', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/settings/payment-gateway`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,6 +185,7 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         showToast('success', '✓ PayU Payment Gateway settings updated successfully!');
+        fetchPayUSettings();
       } else {
         showToast('error', data.message || 'Failed to update PayU settings');
       }
@@ -193,11 +196,38 @@ export default function SettingsPage() {
     }
   };
 
+  const handleTestPayUCredentials = async () => {
+    setTestingPayu(true);
+    setPayuTestResult(null);
+    try {
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const res = await fetch(`${API_BASE_URL}/api/admin/settings/payment-gateway/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      setPayuTestResult(data);
+      if (data.success) {
+        showToast('success', '✓ ' + data.message);
+      } else {
+        showToast('error', data.message || 'PayU credentials verification failed.');
+      }
+    } catch (err) {
+      setPayuTestResult({ success: false, message: 'Network error verifying PayU credentials' });
+      showToast('error', 'Network error verifying PayU credentials');
+    } finally {
+      setTestingPayu(false);
+    }
+  };
+
   const fetchSmtpSettings = async () => {
     setLoadingSmtp(true);
     try {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const res = await fetch('http://localhost:5000/api/smtp-settings/', {
+      const res = await fetch(`${API_BASE_URL}/api/smtp-settings/`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -298,8 +328,8 @@ export default function SettingsPage() {
     try {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
       const url = editingId
-        ? `http://localhost:5000/api/smtp-settings/${editingId}/`
-        : 'http://localhost:5000/api/smtp-settings/';
+        ? `${API_BASE_URL}/api/smtp-settings/${editingId}/`
+        : `${API_BASE_URL}/api/smtp-settings/`;
       const method = editingId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -331,7 +361,7 @@ export default function SettingsPage() {
     const newActiveState = !setting.is_active;
     try {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const res = await fetch(`http://localhost:5000/api/smtp-settings/${setting.id}/`, {
+      const res = await fetch(`${API_BASE_URL}/api/smtp-settings/${setting.id}/`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -358,7 +388,7 @@ export default function SettingsPage() {
 
     try {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
-      const res = await fetch(`http://localhost:5000/api/smtp-settings/${setting.id}/`, {
+      const res = await fetch(`${API_BASE_URL}/api/smtp-settings/${setting.id}/`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -398,7 +428,7 @@ export default function SettingsPage() {
       const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
       const targetId = testingTargetSetting?.id || '0';
 
-      const res = await fetch(`http://localhost:5000/api/smtp-settings/${targetId}/test-connection/`, {
+      const res = await fetch(`${API_BASE_URL}/api/smtp-settings/${targetId}/test-connection/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -432,6 +462,11 @@ export default function SettingsPage() {
     e.preventDefault();
     setProfileMsg({ type: '', text: '' });
 
+    if (!currentPassword) {
+      setProfileMsg({ type: 'error', text: 'Please enter your current password.' });
+      return;
+    }
+
     if (!newPassword || newPassword.length < 4) {
       setProfileMsg({ type: 'error', text: 'New password must be at least 4 characters long.' });
       return;
@@ -442,13 +477,45 @@ export default function SettingsPage() {
     }
 
     setProfileSubmitting(true);
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+      const targetIdentifier = user?.email || user?.username || 'admin@mccmrfip.com';
+
+      const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          email: targetIdentifier,
+          currentPassword,
+          newPassword,
+          confirmPassword
+        })
+      });
+
+      const data = await res.json();
       setProfileSubmitting(false);
-      setProfileMsg({ type: 'success', text: 'Admin account password updated successfully!' });
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    }, 1000);
+
+      if (data.success) {
+        setProfileMsg({ type: 'success', text: 'Admin account password updated successfully in the system!' });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+
+        if (data.token) {
+          localStorage.setItem('adminToken', data.token);
+          sessionStorage.setItem('adminToken', data.token);
+        }
+      } else {
+        setProfileMsg({ type: 'error', text: data.message || 'Failed to update password. Please check your current password.' });
+      }
+    } catch (err) {
+      console.warn('Network issue changing admin password:', err);
+      setProfileSubmitting(false);
+      setProfileMsg({ type: 'error', text: 'Network connection issue. Failed to update password.' });
+    }
   };
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN';
@@ -728,9 +795,9 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <CreditCard size={22} color="#8B0000" />
                 <div>
-                  <h3 className="admin-card-title">PayU India Payment Gateway Settings</h3>
+                  <h3 className="admin-card-title">PayU India Payment Gateway Credentials</h3>
                   <p className="admin-card-subtitle" style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
-                    Configure Merchant Key, Salt and environment mode for PayU Hosted Checkout.
+                    Configure Merchant Key, Merchant Salt, and environment mode for PayU Hosted Checkout & S2S API.
                   </p>
                 </div>
               </div>
@@ -739,43 +806,91 @@ export default function SettingsPage() {
               </span>
             </div>
 
-            <form onSubmit={handleSavePayUSettings} style={{ padding: '1.5rem 0 0 0' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
+            {/* CREDENTIAL NOTICE BANNER */}
+            <div style={{ margin: '1rem 0 0 0', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 10, padding: '0.85rem 1.1rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <Key size={20} color="#0284C7" style={{ flexShrink: 0, marginTop: 2 }} />
+              <div style={{ fontSize: '0.84rem', color: '#0369A1', lineHeight: 1.45 }}>
+                <strong>Merchant Key & Salt Integration Guide:</strong>
+                <br />
+                • <strong>Test / Sandbox:</strong> Use Test Merchant Key <code style={{ backgroundColor: '#E0F2FE', padding: '1px 5px', borderRadius: 4 }}>gtK2yq</code> and Salt <code style={{ backgroundColor: '#E0F2FE', padding: '1px 5px', borderRadius: 4 }}>eCwTwB0s</code> on <code style={{ backgroundColor: '#E0F2FE', padding: '1px 5px', borderRadius: 4 }}>test.payu.in</code>.
+                <br />
+                • <strong>Production / Live:</strong> Obtain your production Key and Salt from your registered <a href="https://payu.in" target="_blank" rel="noreferrer" style={{ color: '#0369A1', fontWeight: 700, textDecoration: 'underline' }}>PayU Dashboard</a> & select Production mode (<code style={{ backgroundColor: '#E0F2FE', padding: '1px 5px', borderRadius: 4 }}>secure.payu.in</code>).
+              </div>
+            </div>
+
+            <form onSubmit={handleSavePayUSettings} style={{ padding: '1.25rem 0 0 0' }}>
+              <div className="modal-form-grid" style={{ marginBottom: '1.25rem' }}>
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>Payment Gateway Name</label>
-                  <input type="text" className="form-input" value="PayU India (Hosted Checkout)" disabled style={{ backgroundColor: '#F8FAFC' }} />
+                  <label className="form-label" style={{ fontWeight: 700 }}>Payment Gateway Provider</label>
+                  <input type="text" className="form-input" value="PayU India (Hosted Checkout & S2S API)" disabled style={{ backgroundColor: '#F8FAFC' }} />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700 }}>Gateway Environment *</label>
                   <select className="form-select" value={payuEnv} onChange={(e) => setPayuEnv(e.target.value)}>
-                    <option value="test">Test / Sandbox (test.payu.in)</option>
-                    <option value="production">Production / Live (secure.payu.in)</option>
+                    <option value="test">Test / Sandbox Mode (test.payu.in)</option>
+                    <option value="production">Production / Live Mode (secure.payu.in)</option>
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700 }}>Merchant Key (KEY) *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={payuKey}
-                    onChange={(e) => setPayuKey(e.target.value)}
-                    placeholder="Enter PayU Merchant Key"
-                    required
-                  />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type={showPayuKey ? "text" : "password"}
+                      className="form-input"
+                      value={payuKey}
+                      onChange={(e) => setPayuKey(e.target.value)}
+                      placeholder="Enter PayU Merchant Key (e.g. gtK2yq)"
+                      required
+                      style={{ paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPayuKey(!showPayuKey)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#64748B'
+                      }}
+                      title={showPayuKey ? "Hide Merchant Key" : "View Merchant Key"}
+                    >
+                      {showPayuKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700 }}>Merchant Salt (SALT) *</label>
-                  <input
-                    type="password"
-                    className="form-input"
-                    value={payuSalt}
-                    onChange={(e) => setPayuSalt(e.target.value)}
-                    placeholder="Enter PayU Merchant Salt"
-                    required
-                  />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input
+                      type={showPayuSalt ? "text" : "password"}
+                      className="form-input"
+                      value={payuSalt}
+                      onChange={(e) => setPayuSalt(e.target.value)}
+                      placeholder="Enter PayU Merchant Salt"
+                      required
+                      style={{ paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPayuSalt(!showPayuSalt)}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#64748B'
+                      }}
+                      title={showPayuSalt ? "Hide Merchant Salt" : "View Merchant Salt"}
+                    >
+                      {showPayuSalt ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -795,7 +910,56 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              {/* PAYU CREDENTIALS TEST DIAGNOSTIC PANEL */}
+              {payuTestResult && (
+                <div
+                  style={{
+                    padding: '1rem 1.25rem',
+                    borderRadius: 10,
+                    marginBottom: '1.5rem',
+                    backgroundColor: payuTestResult.success ? '#F0FDF4' : '#FEF2F2',
+                    border: `1px solid ${payuTestResult.success ? '#86EFAC' : '#FCA5A5'}`
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.4rem' }}>
+                    <span
+                      style={{
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: 12,
+                        fontSize: '0.78rem',
+                        fontWeight: 800,
+                        backgroundColor: payuTestResult.success ? '#16A34A' : '#DC2626',
+                        color: '#FFFFFF'
+                      }}
+                    >
+                      {payuTestResult.success ? '✓ VERIFIED OPERATIONAL' : '✕ VERIFICATION ERROR'}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 700, color: payuTestResult.success ? '#166534' : '#991B1B', margin: '0 0 0.5rem 0' }}>
+                    {payuTestResult.message}
+                  </p>
+                  {payuTestResult.details && (
+                    <div style={{ fontSize: '0.78rem', color: '#475569', fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div>● Target URL: {payuTestResult.details.payuUrl}</div>
+                      <div>● Active Merchant Key: {payuTestResult.details.merchantKey}</div>
+                      <div>● Sample SHA-512 Hash: {payuTestResult.details.generatedHashPreview}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  className="smtp-action-btn smtp-action-btn-test"
+                  onClick={handleTestPayUCredentials}
+                  disabled={testingPayu}
+                  style={{ padding: '0.65rem 1.15rem', fontSize: '0.88rem' }}
+                >
+                  <RefreshCw size={16} className={testingPayu ? 'spin-icon' : ''} />
+                  <span>{testingPayu ? 'Verifying Credentials...' : 'Verify Merchant Credentials'}</span>
+                </button>
+
                 <button type="submit" className="add-company-btn" disabled={savingPayu}>
                   <Check size={16} />
                   <span>{savingPayu ? 'Saving Settings...' : 'Save PayU Gateway Settings'}</span>
@@ -808,7 +972,7 @@ export default function SettingsPage() {
 
       {/* TAB 2: ACCOUNT PROFILE & SECURITY */}
       {activeSubTab === 'profile' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.75rem' }}>
+        <div className="admin-dual-grid">
           {/* PROFILE CARD */}
           <div className="admin-card">
             <div className="admin-card-header">

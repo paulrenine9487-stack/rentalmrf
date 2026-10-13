@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, Download, Printer, FileText, Calendar, Filter, Building2, CreditCard, MapPin } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState('Company Report');
@@ -21,21 +22,21 @@ export default function ReportsPage() {
 
     try {
       if (reportType === 'Company Report') {
-        const res = await fetch('http://localhost:5000/api/reports/companies', { headers });
+        const res = await fetch(`${API_BASE_URL}/api/reports/companies`, { headers });
         const data = await res.json();
         if (data.success) {
           setReportData(data.companies || []);
           setSummary({ total: data.summary?.total || 10, countA: data.summary?.approved || 10, countB: data.summary?.pending || 0 });
         }
       } else if (reportType === 'Payment Report' || reportType === 'Revenue Report') {
-        const res = await fetch('http://localhost:5000/api/reports/payments', { headers });
+        const res = await fetch(`${API_BASE_URL}/api/reports/payments`, { headers });
         const data = await res.json();
         if (data.success) {
           setReportData(data.payments || []);
           setSummary({ total: data.summary?.total || 4, countA: data.summary?.paid || 1, countB: data.summary?.pending || 3 });
         }
       } else {
-        const res = await fetch('http://localhost:5000/api/reports/places', { headers });
+        const res = await fetch(`${API_BASE_URL}/api/reports/places`, { headers });
         const data = await res.json();
         if (data.success) {
           setReportData(data.places || []);
@@ -80,7 +81,7 @@ export default function ReportsPage() {
     >
       {/* 1. REPORT FILTER CONTROLS */}
       <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+        <div className="admin-quad-grid">
           <div>
             <label className="profile-field-label">Report Type</label>
             <select

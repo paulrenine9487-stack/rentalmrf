@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import InvoiceReceiptModal from '../components/InvoiceReceiptModal';
 import Footer from '../components/Footer';
+import { API_BASE_URL } from '../utils/apiConfig';
 import './PaymentPage.css';
 
 
@@ -81,8 +82,8 @@ export default function PaymentPage() {
 
     // Fetch invoice and company details from backend API
     const fetchUrl = invIdToFetch
-      ? `http://localhost:5000/api/invoices/${invIdToFetch}`
-      : `http://localhost:5000/api/invoices?company_id=${compId}`;
+      ? `${API_BASE_URL}/api/invoices/${invIdToFetch}`
+      : `${API_BASE_URL}/api/invoices?company_id=${compId}`;
 
     fetch(fetchUrl)
       .then((res) => res.json())
@@ -113,15 +114,26 @@ export default function PaymentPage() {
     place: 'MCafe Pod'
   };
 
+  const paramMonth = searchParams.get('month');
+  const paramAmount = searchParams.get('amount');
+  const paramTxnId = searchParams.get('txnid');
+
+  let checkoutStored = null;
+  try {
+    const raw = localStorage.getItem('pending_payment_checkout');
+    if (raw) checkoutStored = JSON.parse(raw);
+  } catch (e) {}
+
   const activeInvoice = invoice || {
-    id: 1,
+    id: invoiceId || checkoutStored?.id || 1,
     invoice_number: `INV-MRF-2026-${String(activeCompany.s_no || activeCompany.id).padStart(5, '0')}`,
     company_id: activeCompany.id,
     company_name: activeCompany.company_name,
     place: activeCompany.place,
-    billing_period: 'August 2026',
-    amount: activeCompany.monthly_rate || 10000,
-    total_amount: activeCompany.monthly_rate || 10000,
+    billing_period: paramMonth || checkoutStored?.month || 'August 2026',
+    amount: Number(paramAmount || checkoutStored?.amount || activeCompany.monthly_rate || 10000),
+    total_amount: Number(paramAmount || checkoutStored?.amount || activeCompany.monthly_rate || 10000),
+    txnid: paramTxnId || checkoutStored?.txnid || `TXN${Date.now()}`,
     issue_date: '2026-08-01',
     due_date: '2026-08-31',
     status: 'UNPAID'
@@ -129,124 +141,61 @@ export default function PaymentPage() {
 
   const amountInr = Number(activeInvoice.total_amount || activeInvoice.amount || activeCompany.monthly_rate || 10000);
   const amountFormatted = amountInr.toLocaleString('en-IN');
-  const isInvoiceAlreadyPaid = activeInvoice.status === 'PAID' || paymentState === 'success';
+  const hasIncomingPaymentIntent = Boolean(paramMonth || paramAmount || paramTxnId || checkoutStored);
+  const isInvoiceAlreadyPaid = paymentState === 'success' || (activeInvoice.status === 'PAID' && !hasIncomingPaymentIntent);
 
-  // Perform server-side HMAC signature verification
-  const verifyPaymentOnServer = async (razorpay_order_id, razorpay_payment_id, razorpay_signature) => {
-    setGatewayProcessing(true);
-    setPaymentState('processing');
-
-    try {
-      const verifyRes = await fetch('http://localhost:5000/api/payments/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          razorpay_order_id,
-          razorpay_payment_id,
-          razorpay_signature,
-          invoice_id: activeInvoice.id,
-          payment_method:
-            selectedMethod === 'upi'
-              ? `Razorpay UPI (${upiOption.toUpperCase()})`
-              : 'Razorpay Card (Credit / Debit)'
-        })
-      });
-
-      const verifyData = await verifyRes.json();
-      setGatewayProcessing(false);
-      setShowInteractiveGatewayModal(false);
-
-      if (verifyData.success) {
-        setPaymentState('success');
-        setVerifiedDetails({
-          payment_id: razorpay_payment_id,
-          order_id: razorpay_order_id,
-          amount: amountInr,
-          company_name: activeCompany.company_name,
-          invoice_number: activeInvoice.invoice_number,
-          billing_period: activeInvoice.billing_period,
-          payment_date: new Date().toISOString(),
-          status: 'PAID'
-        });
-        setInvoice((prev) => (prev ? { ...prev, status: 'PAID' } : prev));
-      } else {
-        setPaymentState('failed');
-        setErrorMessage(verifyData.message || 'Payment verification failed.');
-      }
-    } catch (err) {
-      console.error('Verification error:', err);
-      setGatewayProcessing(false);
-      setShowInteractiveGatewayModal(false);
-      setPaymentState('failed');
-      setErrorMessage('Server-side payment verification failed.');
-    }
-  };
-
-  const setShowInteractiveGatewayModal = (val) => {
-    setShowGatewayModal(val);
-  };
-
-  // Trigger Payment Flow & Redirect to PayU Hosted Checkout
+  // Trigger PayU Payment Flow & Redirect to official PayU Hosted Checkout Page
   const handleProceedToPay = async () => {
     if (paymentState === 'processing' || gatewayProcessing) return;
 
     setPaymentState('processing');
     setErrorMessage('');
 
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token') || localStorage.getItem('adminToken') || sessionStorage.getItem('adminToken');
+
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/payments/create-payu-payment', {
+      const res = await fetch(`${API_BASE_URL}/api/payments/create-payu-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          company_id: activeCompany.id,
-          invoice_id: activeInvoice.id,
-          billing_month: activeInvoice.billing_period || 'August 2026'
+          company_id: activeCompany?.id || 1,
+          invoice_id: activeInvoice?.id || 1,
+          billing_month: activeInvoice?.billing_period || 'August 2026'
         })
       });
 
       const data = await res.json();
-      if (!data.success || !data.payuUrl || !data.params) {
-        setPaymentState('failed');
-        setErrorMessage(data.message || 'Failed to initiate PayU payment. Please try again.');
+      const targetPayUUrl = data?.payuUrl || 'https://test.payu.in/_payment';
+
+      if (data.success && data.params) {
+        // Automatically submit hidden HTML form directly to official PayU Hosted Checkout Gateway
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = targetPayUUrl;
+
+        Object.keys(data.params).forEach((key) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = data.params[key] != null ? data.params[key] : '';
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
         return;
       }
 
-      setPaymentState('redirecting');
-
-      // Submit dynamic form to PayU Hosted Checkout URL
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = data.payuUrl;
-
-      Object.keys(data.params).forEach((key) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = data.params[key];
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
-    } catch (err) {
-      console.error('Error initiating PayU payment:', err);
       setPaymentState('failed');
-      setErrorMessage('Failed to connect to PayU payment gateway. Please check network connection.');
+      setErrorMessage(data?.message || 'Failed to initiate PayU payment session. Please check server configuration.');
+    } catch (err) {
+      console.error('Error initiating PayU checkout:', err);
+      setPaymentState('failed');
+      setErrorMessage('Network error connecting to PayU payment gateway. Please try again.');
     }
-  };
-
-  // Complete Payment Action from inside the Interactive Modal
-  const handleAuthorizeModalPayment = async () => {
-    if (!pendingOrderData) return;
-    const paymentId = `pay_${upiOption}_${Date.now()}`;
-    const orderId = pendingOrderData.orderId;
-    const signature = `verified_sig_${Date.now()}`;
-
-    await verifyPaymentOnServer(orderId, paymentId, signature);
   };
 
   if (loading) {
@@ -335,7 +284,7 @@ export default function PaymentPage() {
                       place: activeCompany.place,
                       billing_period: activeInvoice.billing_period || 'August 2026',
                       amount: amountInr,
-                      payment_method: 'Razorpay Standard Checkout (UPI / Cards)',
+                      payment_method: 'PayU India (UPI / Cards)',
                       payment_date: verifiedDetails?.payment_date || new Date().toISOString(),
                       payment_id: verifiedDetails?.payment_id || `pay_${activeInvoice.id}`
                     })
@@ -343,6 +292,17 @@ export default function PaymentPage() {
                 >
                   <Download size={16} />
                   <span>Download Receipt</span>
+                </button>
+                <button
+                  className="status-btn"
+                  style={{ backgroundColor: '#8B0000', color: '#FFFFFF', border: 'none' }}
+                  onClick={() => {
+                    setInvoice((prev) => (prev ? { ...prev, status: 'UNPAID' } : null));
+                    setPaymentState('idle');
+                  }}
+                >
+                  <CreditCard size={16} />
+                  <span>Pay Rent / New Payment</span>
                 </button>
                 <button className="status-btn secondary-btn" onClick={() => navigate('/dashboard')}>
                   Back to Dashboard
@@ -470,176 +430,39 @@ export default function PaymentPage() {
                   <span className="amount-label">Total Amount Due</span>
                   <span className="amount-value">₹{amountFormatted}</span>
                 </div>
-              </div>
 
-              {/* RIGHT COLUMN: PAYMENT METHOD SELECTION */}
-              <div className="payment-card method-card">
-                <div className="card-header-bar">
-                  <CreditCard size={20} className="header-icon" />
-                  <h3 className="card-title">Choose Payment Method</h3>
-                </div>
-
-                {/* 2 METHOD TABS: ONLY UPI & CARD */}
-                <div className="method-selector-tabs">
-                  <button
-                    type="button"
-                    className={`method-tab-btn ${selectedMethod === 'upi' ? 'active' : ''}`}
-                    onClick={() => setSelectedMethod('upi')}
-                  >
-                    <Smartphone size={20} />
-                    <span>UPI</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`method-tab-btn ${selectedMethod === 'card' ? 'active' : ''}`}
-                    onClick={() => setSelectedMethod('card')}
-                  >
-                    <CreditCard size={20} />
-                    <span>Card</span>
-                  </button>
-                </div>
-
-                {/* TAB 1: UPI UI */}
-                {selectedMethod === 'upi' && (
-                  <div className="tab-content-panel">
-                    <h4 className="panel-heading">Pay using UPI</h4>
-                    <p className="panel-subtext">Choose your preferred UPI application or scan QR code:</p>
-
-                    <div className="upi-options-grid">
-                      <button
-                        type="button"
-                        className={`upi-app-badge ${upiOption === 'gpay' ? 'selected' : ''}`}
-                        onClick={() => setUpiOption('gpay')}
-                      >
-                        <div className="app-logo-circle gpay">GPay</div>
-                        <span>Google Pay</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`upi-app-badge ${upiOption === 'phonepe' ? 'selected' : ''}`}
-                        onClick={() => setUpiOption('phonepe')}
-                      >
-                        <div className="app-logo-circle phonepe">Pe</div>
-                        <span>PhonePe</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`upi-app-badge ${upiOption === 'other' ? 'selected' : ''}`}
-                        onClick={() => setUpiOption('other')}
-                      >
-                        <div className="app-logo-circle paytm">UPI</div>
-                        <span>Other UPI</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`upi-app-badge ${upiOption === 'qr' ? 'selected' : ''}`}
-                        onClick={() => setUpiOption('qr')}
-                      >
-                        <QrCode size={22} color="#8B0000" />
-                        <span>Scan UPI QR</span>
-                      </button>
-                    </div>
-
-                    <div className="upi-notice-box">
-                      <ShieldCheck size={18} color="#8B0000" />
-                      <span>
-                        Secure transaction authenticated directly by your UPI app. No bank PIN or OTP is stored on our servers.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB 2: CARD UI */}
-                {selectedMethod === 'card' && (
-                  <div className="tab-content-panel">
-                    <h4 className="panel-heading">Pay using Credit / Debit Card</h4>
-                    <p className="panel-subtext">Enter your card details for tokenized checkout:</p>
-
-                    <div className="card-input-form">
-                      <div className="form-group">
-                        <label className="form-label">Card Number</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="4532 •••• •••• 8901"
-                          maxLength={19}
-                          autoComplete="off"
-                          value={cardFields.number}
-                          onChange={(e) => setCardFields({ ...cardFields, number: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="form-row-dual">
-                        <div className="form-group">
-                          <label className="form-label">Expiry (MM/YY)</label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="12 / 28"
-                            maxLength={5}
-                            autoComplete="off"
-                            value={cardFields.expiry}
-                            onChange={(e) => setCardFields({ ...cardFields, expiry: e.target.value })}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label">CVV Code</label>
-                          <input
-                            type="password"
-                            className="form-control"
-                            placeholder="•••"
-                            maxLength={4}
-                            autoComplete="off"
-                            value={cardFields.cvv}
-                            onChange={(e) => setCardFields({ ...cardFields, cvv: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Cardholder Name</label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="Name on Card"
-                          autoComplete="off"
-                          value={cardFields.name}
-                          onChange={(e) => setCardFields({ ...cardFields, name: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="upi-notice-box">
-                      <ShieldCheck size={18} color="#8B0000" />
-                      <span>
-                        Card details are tokenized by PCI-DSS compliant payment gateway. We NEVER store card number or CVV.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* ACTION PROCEED BUTTON */}
-                <div className="proceed-action-area">
+                <div className="proceed-action-area" style={{ marginTop: '1.5rem' }}>
                   <button
                     type="button"
                     className="proceed-pay-btn"
                     onClick={handleProceedToPay}
                     disabled={paymentState === 'processing' || gatewayProcessing}
+                    style={{
+                      backgroundColor: '#16A34A',
+                      color: '#FFFFFF',
+                      width: '100%',
+                      padding: '1rem',
+                      borderRadius: '10px',
+                      fontSize: '1.05rem',
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.65rem',
+                      boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)'
+                    }}
                   >
-                    <Lock size={18} />
+                    <Lock size={20} />
                     <span>
                       {paymentState === 'processing'
-                        ? 'Initiating Secure Gateway...'
-                        : `Proceed to Pay ₹${amountFormatted}`}
+                        ? 'Opening PayU Gateway...'
+                        : `Proceed to PayU Checkout ₹${amountFormatted}`}
                     </span>
                   </button>
-                  <div className="footer-secure-note">
-                    Secure payment processed via tokenized gateway layer for MCC MRF Innovation Park
+                  <div className="footer-secure-note" style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.8rem', color: '#64748B' }}>
+                    100% Secure Payment processed via PayU Gateway for MCC MRF Innovation Park
                   </div>
                 </div>
               </div>
@@ -647,208 +470,6 @@ export default function PaymentPage() {
           </>
         )}
       </main>
-
-      {/* INTERACTIVE PAYMENT GATEWAY CHECKOUT MODAL */}
-      {showGatewayModal && (
-        <div className="gateway-modal-overlay">
-          <div className="gateway-modal-box">
-            {/* MODAL HEADER */}
-            <div className="gateway-modal-header">
-              <div className="gateway-header-left">
-                <ShieldCheck size={22} color="#8B0000" />
-                <div>
-                  <h3 className="gateway-title">MCC MRF Secure Payment Gateway</h3>
-                  <span className="gateway-subtitle">
-                    Order ID: {pendingOrderData?.orderId}
-                  </span>
-                </div>
-              </div>
-              <button
-                className="gateway-close-btn"
-                onClick={() => {
-                  setShowGatewayModal(false);
-                  setPaymentState('cancelled');
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* MODAL BODY: SUITABLE PAYMENT INTERFACE */}
-            <div className="gateway-modal-body">
-              <div className="gateway-amount-banner">
-                <span className="banner-merchant">Merchant: MCC MRF Innovation Park</span>
-                <span className="banner-amount">₹{amountFormatted}</span>
-              </div>
-
-              {/* 1. GOOGLE PAY INTENT VIEW */}
-              {selectedMethod === 'upi' && upiOption === 'gpay' && (
-                <div className="gateway-app-view">
-                  <div className="app-badge-header gpay-theme">
-                    <div className="gpay-big-logo">GPay</div>
-                    <h4>Pay with Google Pay</h4>
-                  </div>
-
-                  <p className="app-instruction">
-                    Payment request sent to Google Pay registered mobile number (<strong>{activeCompany.contact_number}</strong>).
-                  </p>
-                  <p className="app-subinstruction">
-                    VPA: <strong>mccmrfip@okaxis</strong>
-                  </p>
-
-                  <div className="app-action-box">
-                    <button
-                      className="gateway-authorize-btn gpay-btn"
-                      onClick={handleAuthorizeModalPayment}
-                      disabled={gatewayProcessing}
-                    >
-                      {gatewayProcessing ? (
-                        <>
-                          <RefreshCw size={18} className="spin-icon" />
-                          <span>Authorizing in Google Pay...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={18} />
-                          <span>Authorize & Pay ₹{amountFormatted} via Google Pay</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 2. PHONEPE INTENT VIEW */}
-              {selectedMethod === 'upi' && upiOption === 'phonepe' && (
-                <div className="gateway-app-view">
-                  <div className="app-badge-header phonepe-theme">
-                    <div className="phonepe-big-logo">Pe</div>
-                    <h4>Pay with PhonePe</h4>
-                  </div>
-
-                  <p className="app-instruction">
-                    Payment notification sent to your PhonePe account. Open PhonePe app to approve.
-                  </p>
-                  <p className="app-subinstruction">
-                    VPA: <strong>mccmrfip@ybl</strong>
-                  </p>
-
-                  <div className="app-action-box">
-                    <button
-                      className="gateway-authorize-btn phonepe-btn"
-                      onClick={handleAuthorizeModalPayment}
-                      disabled={gatewayProcessing}
-                    >
-                      {gatewayProcessing ? (
-                        <>
-                          <RefreshCw size={18} className="spin-icon" />
-                          <span>Authenticating in PhonePe...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send size={18} />
-                          <span>Authorize & Pay ₹{amountFormatted} via PhonePe</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. DYNAMIC SCAN UPI QR VIEW */}
-              {selectedMethod === 'upi' && (upiOption === 'qr' || upiOption === 'other') && (
-                <div className="gateway-app-view">
-                  <h4 className="qr-title">Scan Dynamic UPI QR Code</h4>
-                  <p className="app-subinstruction">
-                    Scan using Google Pay, PhonePe, Paytm, BHIM or any UPI app to pay:
-                  </p>
-
-                  <div className="qr-code-box">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=mccmrfip@okaxis%26pn=MCCMRF%20Innovation%20Park%26am=${amountInr}%26cu=INR`}
-                      alt="MCC MRF Dynamic UPI QR Code"
-                      className="qr-img-display"
-                    />
-                    <div className="qr-timer">Expires in: 04:59</div>
-                  </div>
-
-                  <div className="app-action-box">
-                    <button
-                      className="gateway-authorize-btn qr-btn"
-                      onClick={handleAuthorizeModalPayment}
-                      disabled={gatewayProcessing}
-                    >
-                      {gatewayProcessing ? (
-                        <>
-                          <RefreshCw size={18} className="spin-icon" />
-                          <span>Verifying Payment...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 size={18} />
-                          <span>I Have Paid ₹{amountFormatted} - Verify Transaction</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 4. CARD 3D-SECURE OTP VIEW */}
-              {selectedMethod === 'card' && (
-                <div className="gateway-app-view">
-                  <div className="card-secure-header">
-                    <Key size={24} color="#8B0000" />
-                    <h4>Bank 3D-Secure 2-Factor Authentication</h4>
-                  </div>
-
-                  <p className="app-instruction">
-                    One-Time Password (OTP) sent to mobile number ending in ••••{activeCompany.contact_number.slice(-4)}.
-                  </p>
-
-                  <div className="otp-input-area">
-                    <label className="form-label">Enter 6-Digit OTP</label>
-                    <input
-                      type="text"
-                      className="form-control otp-control"
-                      placeholder="••••••"
-                      autoComplete="off"
-                      value={otpInput}
-                      maxLength={6}
-                      onChange={(e) => setOtpInput(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="app-action-box">
-                    <button
-                      className="gateway-authorize-btn card-btn"
-                      onClick={handleAuthorizeModalPayment}
-                      disabled={gatewayProcessing}
-                    >
-                      {gatewayProcessing ? (
-                        <>
-                          <RefreshCw size={18} className="spin-icon" />
-                          <span>Verifying Card OTP...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Lock size={18} />
-                          <span>Submit OTP & Pay ₹{amountFormatted}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="gateway-modal-footer">
-              <ShieldCheck size={16} color="#8B0000" />
-              <span>MCC MRF Innovation Park Institutional Gateway</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* RECEIPT MODAL POPUP */}
       {showReceipt && (

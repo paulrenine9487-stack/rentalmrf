@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu as MenuIcon, Plus, Edit2, Trash2, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function MenuManagementPage() {
   const [menus, setMenus] = useState([]);
@@ -29,7 +30,7 @@ export default function MenuManagementPage() {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
-      const res = await fetch('http://localhost:5000/api/menus', { headers });
+      const res = await fetch(`${API_BASE_URL}/api/menus`, { headers });
       const data = await res.json();
       if (data.success) {
         setMenus(data.menus || []);
@@ -46,7 +47,7 @@ export default function MenuManagementPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch('http://localhost:5000/api/menus', {
+      const res = await fetch(`${API_BASE_URL}/api/menus`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export default function MenuManagementPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/menus/${selectedMenu.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/menus/${selectedMenu.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +108,7 @@ export default function MenuManagementPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/menus/${selectedMenu.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/menus/${selectedMenu.id}`, {
         method: 'DELETE',
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });

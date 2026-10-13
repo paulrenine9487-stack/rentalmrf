@@ -1,58 +1,72 @@
 const crypto = require('crypto');
-const db = require('../db');
-const { decryptSmtpPassword } = require('../utils/cryptoUtil');
 
 /**
  * Resolves active PayU Merchant Key, Salt, and Environment
- * Checks MySQL active database setting first, falls back to .env
+ * Strictly prioritizes backend environment variables (.env) over cached database settings.
+ * NEVER hardcodes exposed credentials or falls back to old/unauthorized salts.
  */
 async function getPayUConfig() {
-  try {
-    const dbSetting = db.getPayUSetting ? await db.getPayUSetting() : null;
-    if (dbSetting && dbSetting.merchant_key && dbSetting.merchant_salt) {
-      const isProd = (dbSetting.environment || '').toLowerCase() === 'production';
-      return {
-        merchantKey: dbSetting.merchant_key,
-        merchantSalt: dbSetting.merchant_salt,
-        environment: isProd ? 'production' : 'test',
-        payuUrl: isProd ? 'https://secure.payu.in/_payment' : 'https://test.payu.in/_payment',
-        verifyUrl: isProd ? 'https://info.payu.in/merchant/postservice?form=2' : 'https://test.payu.in/merchant/postservice?form=2',
-        allowedMethods: dbSetting.allowed_methods || ['UPI', 'CARD']
-      };
-    }
-  } catch (e) {
-    console.warn('[PAYU SERVICE] Warning resolving DB PayU config:', e.message);
+  const envRaw = (process.env.PAYU_ENVIRONMENT || 'test').toLowerCase().trim();
+  const isProd = envRaw === 'production';
+
+  // Read credentials strictly from backend environment variables
+  const merchantKey = (process.env.PAYU_MERCHANT_KEY || '').trim();
+  const merchantSalt = (process.env.PAYU_MERCHANT_SALT || '').trim();
+
+  // Validate that credentials exist and are not empty or template placeholders
+  if (!merchantKey || !merchantSalt || merchantKey === '<MY_CURRENT_TEST_MERCHANT_KEY>' || merchantSalt === '<MY_NEWLY_GENERATED_TEST_MERCHANT_SALT>') {
+    const errorMsg = '[PAYU CONFIG ERROR] PayU Merchant Key or Salt is not configured in backend environment variables (.env). Please ensure PAYU_MERCHANT_KEY and PAYU_MERCHANT_SALT are set.';
+    console.error(errorMsg);
+    throw new Error('PayU Payment Gateway credentials are not properly configured on the server. Please check your backend .env file.');
   }
 
-  const env = (process.env.PAYU_ENVIRONMENT || 'test').toLowerCase();
-  const isProd = env === 'production';
+  const payuUrl = isProd ? 'https://secure.payu.in/_payment' : 'https://test.payu.in/_payment';
+  const verifyUrl = isProd ? 'https://info.payu.in/merchant/postservice?form=2' : 'https://test.payu.in/merchant/postservice?form=2';
+
   return {
-    merchantKey: process.env.PAYU_MERCHANT_KEY || 'gtK2yq',
-    merchantSalt: process.env.PAYU_MERCHANT_SALT || 'eCwTwB0s',
+    merchantKey,
+    merchantSalt,
     environment: isProd ? 'production' : 'test',
-    payuUrl: isProd ? 'https://secure.payu.in/_payment' : 'https://test.payu.in/_payment',
-    verifyUrl: isProd ? 'https://info.payu.in/merchant/postservice?form=2' : 'https://test.payu.in/merchant/postservice?form=2',
+    payuUrl,
+    verifyUrl,
     allowedMethods: ['UPI', 'CARD']
   };
 }
 
 /**
- * Generates SHA-512 Hash for PayU Payment Initiation
+ * Generates SHA-512 Hash for PayU Hosted Checkout Initiation
  * Sequence: sha512(key|txnid|amount|productinfo|firstname|email|udf1|udf2|udf3|udf4|udf5||||||SALT)
+ * Exactly 16 pipe delimiters separating 17 segments (udf6 through udf10 are empty in standard Hosted Checkout).
  */
 function generatePayUHash({ key, txnid, amount, productinfo, firstname, email, udf1 = '', udf2 = '', udf3 = '', udf4 = '', udf5 = '', salt }) {
-  const formattedAmount = Number(amount).toFixed(2);
-  const hashString = `${key}|${txnid}|${formattedAmount}|${productinfo}|${firstname}|${email}|${udf1}|${udf2}|${udf3}|${udf4}|${udf5}||||||${salt}`;
-  return crypto.createHash('sha512').update(hashString).digest('hex');
+  if (!key || !txnid || amount == null || !salt) {
+    throw new Error('Missing mandatory fields for PayU hash generation');
+  }
+
+  const cleanKey = String(key).trim();
+  const cleanTxnid = String(txnid).trim();
+  const amountStr = Number(amount).toFixed(2);
+  const cleanProductInfo = String(productinfo || 'MRFRentPayment').replace(/[\r\n\t]/g, ' ').trim();
+  const cleanFirstname = String(firstname || 'Customer').replace(/[\r\n\t]/g, ' ').trim();
+  const cleanEmail = String(email || 'accounts@mccmrfip.com').replace(/[\r\n\t]/g, ' ').trim();
+  const cleanUdf1 = String(udf1 || '').trim();
+  const cleanUdf2 = String(udf2 || '').trim();
+  const cleanUdf3 = String(udf3 || '').trim();
+  const cleanUdf4 = String(udf4 || '').trim();
+  const cleanUdf5 = String(udf5 || '').trim();
+  const cleanSalt = String(salt).trim();
+
+  const hashString = `${cleanKey}|${cleanTxnid}|${amountStr}|${cleanProductInfo}|${cleanFirstname}|${cleanEmail}|${cleanUdf1}|${cleanUdf2}|${cleanUdf3}|${cleanUdf4}|${cleanUdf5}||||||${cleanSalt}`;
+  return crypto.createHash('sha512').update(hashString, 'utf8').digest('hex');
 }
 
 /**
  * Verifies PayU Response Reverse Hash
- * Sequence: sha512(SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
+ * Standard Sequence: sha512(SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
  * With additionalCharges: sha512(additionalCharges|SALT|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key)
  */
 function verifyPayUResponseHash(resBody, salt) {
-  if (!resBody || !resBody.hash) return false;
+  if (!resBody || !resBody.hash || !salt) return false;
 
   const {
     key = '',
@@ -71,34 +85,59 @@ function verifyPayUResponseHash(resBody, salt) {
     hash = ''
   } = resBody;
 
+  const cleanSalt = String(salt).trim();
+  const cleanKey = String(key).trim();
+  const cleanTxnid = String(txnid).trim();
+  const cleanStatus = String(status).trim();
+  const cleanProductInfo = String(productinfo || '').trim();
+  const cleanFirstname = String(firstname || '').trim();
+  const cleanEmail = String(email || '').trim();
+  const cleanUdf1 = String(udf1 || '').trim();
+  const cleanUdf2 = String(udf2 || '').trim();
+  const cleanUdf3 = String(udf3 || '').trim();
+  const cleanUdf4 = String(udf4 || '').trim();
+  const cleanUdf5 = String(udf5 || '').trim();
+  const cleanHash = String(hash).trim().toLowerCase();
+
   const formattedAmount = Number(amount).toFixed(2);
-  let hashString = '';
+  const rawAmount = String(amount).trim();
 
-  if (additionalCharges) {
-    hashString = `${additionalCharges}|${salt}|${status}||||||${udf5}|${udf4}|${udf3}|${udf2}|${udf1}|${email}|${firstname}|${productinfo}|${formattedAmount}|${txnid}|${key}`;
-  } else {
-    hashString = `${salt}|${status}||||||${udf5}|${udf4}|${udf3}|${udf2}|${udf1}|${email}|${firstname}|${productinfo}|${formattedAmount}|${txnid}|${key}`;
-  }
+  // 1. Try formatted amount first (e.g. 11800.00)
+  const hashStringFormatted = additionalCharges
+    ? `${additionalCharges}|${cleanSalt}|${cleanStatus}||||||${cleanUdf5}|${cleanUdf4}|${cleanUdf3}|${cleanUdf2}|${cleanUdf1}|${cleanEmail}|${cleanFirstname}|${cleanProductInfo}|${formattedAmount}|${cleanTxnid}|${cleanKey}`
+    : `${cleanSalt}|${cleanStatus}||||||${cleanUdf5}|${cleanUdf4}|${cleanUdf3}|${cleanUdf2}|${cleanUdf1}|${cleanEmail}|${cleanFirstname}|${cleanProductInfo}|${formattedAmount}|${cleanTxnid}|${cleanKey}`;
 
-  const computedHash = crypto.createHash('sha512').update(hashString).digest('hex');
-  return computedHash.toLowerCase() === hash.toLowerCase();
+  const computedHashFormatted = crypto.createHash('sha512').update(hashStringFormatted, 'utf8').digest('hex');
+  if (computedHashFormatted.toLowerCase() === cleanHash) return true;
+
+  // 2. Try raw amount string (e.g. 11800)
+  const hashStringRaw = additionalCharges
+    ? `${additionalCharges}|${cleanSalt}|${cleanStatus}||||||${cleanUdf5}|${cleanUdf4}|${cleanUdf3}|${cleanUdf2}|${cleanUdf1}|${cleanEmail}|${cleanFirstname}|${cleanProductInfo}|${rawAmount}|${cleanTxnid}|${cleanKey}`
+    : `${cleanSalt}|${cleanStatus}||||||${cleanUdf5}|${cleanUdf4}|${cleanUdf3}|${cleanUdf2}|${cleanUdf1}|${cleanEmail}|${cleanFirstname}|${cleanProductInfo}|${rawAmount}|${cleanTxnid}|${cleanKey}`;
+
+  const computedHashRaw = crypto.createHash('sha512').update(hashStringRaw, 'utf8').digest('hex');
+  return computedHashRaw.toLowerCase() === cleanHash;
 }
 
 /**
- * Server-to-Server Verification of PayU Transaction via verify_payment API
+ * Server-to-Server Verification of PayU Transaction via official verify_payment API
  * Command: verify_payment
  * Hash: sha512(key|command|var1|salt)
  */
 async function verifyPayUTransactionWithApi({ txnid, merchantKey, merchantSalt, verifyUrl }) {
   try {
+    if (!txnid || !merchantKey || !merchantSalt || !verifyUrl) {
+      return { success: false, message: 'Missing parameters for server-side verification' };
+    }
+
     const command = 'verify_payment';
-    const hashString = `${merchantKey}|${command}|${txnid}|${merchantSalt}`;
-    const hash = crypto.createHash('sha512').update(hashString).digest('hex');
+    const hashString = `${merchantKey.trim()}|${command}|${txnid.trim()}|${merchantSalt.trim()}`;
+    const hash = crypto.createHash('sha512').update(hashString, 'utf8').digest('hex');
 
     const params = new URLSearchParams();
-    params.append('key', merchantKey);
+    params.append('key', merchantKey.trim());
     params.append('command', command);
-    params.append('var1', txnid);
+    params.append('var1', txnid.trim());
     params.append('hash', hash);
 
     const response = await fetch(verifyUrl, {
@@ -119,7 +158,7 @@ async function verifyPayUTransactionWithApi({ txnid, merchantKey, merchantSalt, 
         details
       };
     }
-    return { success: false, message: data.msg || 'Transaction not found on PayU' };
+    return { success: false, message: data.msg || 'Transaction not found on PayU verify_payment API' };
   } catch (err) {
     console.error('[PAYU SERVICE] API verification error:', err.message);
     return { success: false, error: err.message };

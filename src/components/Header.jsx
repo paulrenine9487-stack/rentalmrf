@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { API_BASE_URL } from '../utils/apiConfig';
 import './Header.css';
 
 export default function Header() {
@@ -63,7 +64,7 @@ export default function Header() {
   const [dynamicMenus, setDynamicMenus] = useState([]);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/menus/public')
+    fetch(`${API_BASE_URL}/api/menus/public`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.menus && data.menus.length > 0) {
@@ -107,7 +108,11 @@ export default function Header() {
         <nav className={`header-nav ${mobileMenuOpen ? 'mobile-open' : ''}`}>
           {dynamicMenus && dynamicMenus.length > 0 ? (
             dynamicMenus
-              .filter((item) => item.url !== '/login' && (item.title || '').toLowerCase() !== 'login')
+              .filter((item) => {
+                const title = (item.title || '').toLowerCase().trim();
+                const url = (item.url || '').toLowerCase().trim();
+                return url !== '/login' && title !== 'login' && title !== 'contact' && !url.includes('contact');
+              })
               .map((item) => (
                 item.url.startsWith('/') && !item.url.includes('#') ? (
                   <Link

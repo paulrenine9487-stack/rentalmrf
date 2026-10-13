@@ -502,3 +502,125 @@
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* ==========================================================================
+   MOBILE & TABLET RESPONSIVE SYSTEM FOR LOGIN & PORTAL GATEWAYS
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .portal-login-nav {
+    height: auto;
+    padding: 0.75rem 0;
+  }
+
+  .portal-nav-container {
+    gap: 0.75rem;
+  }
+
+  .portal-brand-link {
+    gap: 0.65rem;
+  }
+
+  .portal-logo-img {
+    height: 38px;
+  }
+
+  .portal-title-main {
+    font-size: 0.96rem;
+  }
+
+  .portal-title-sub {
+    font-size: 0.72rem;
+  }
+
+  .back-to-home-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    gap: 0.35rem;
+    white-space: nowrap;
+  }
+
+  .portal-login-main {
+    padding: 2rem 1rem;
+  }
+
+  .portal-login-card {
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(90, 0, 0, 0.08);
+  }
+
+  .portal-card-header {
+    padding: 1.5rem 1.25rem 0.75rem 1.25rem;
+  }
+
+  .card-logo-badge {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 0.85rem;
+  }
+
+  .card-crest-img {
+    height: 42px;
+  }
+
+  .card-login-title {
+    font-size: 1.45rem;
+  }
+
+  .card-login-sub {
+    font-size: 0.88rem;
+  }
+
+  .portal-card-body {
+    padding: 1.15rem 1.15rem 1.85rem 1.15rem;
+  }
+
+  .portal-form {
+    gap: 1.1rem;
+  }
+
+  .form-options-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .portal-submit-btn {
+    padding: 0.85rem 1.25rem;
+    font-size: 0.95rem;
+  }
+
+  .portal-copyright-container {
+    font-size: 0.78rem;
+    text-align: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0 0.5rem;
+  }
+}
+
+@media (max-width: 440px) {
+  .portal-title-sub {
+    display: none;
+  }
+
+  .portal-title-main {
+    font-size: 0.88rem;
+  }
+
+  .portal-logo-img {
+    height: 34px;
+  }
+
+  .back-to-home-btn span {
+    font-size: 0.78rem;
+  }
+
+  .portal-card-header {
+    padding: 1.25rem 1rem 0.5rem 1rem;
+  }
+
+  .portal-card-body {
+    padding: 1rem 0.85rem 1.5rem 0.85rem;
+  }
+}

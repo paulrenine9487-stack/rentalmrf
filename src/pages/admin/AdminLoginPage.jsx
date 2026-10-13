@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Lock, User, ArrowRight, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { API_BASE_URL } from '../../utils/apiConfig';
 import '../../styles/admin.css';
 
 export default function AdminLoginPage() {
@@ -19,7 +20,7 @@ export default function AdminLoginPage() {
         if (u && u.role) {
           navigate('/admin/dashboard');
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [navigate]);
 
@@ -38,7 +39,7 @@ export default function AdminLoginPage() {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: loginId, password: loginPass })
@@ -62,7 +63,7 @@ export default function AdminLoginPage() {
       // Offline Fallback Authentication
       if (
         (loginId === 'MCCMRFIP@super' || loginId === 'superadmin@mccmrfip.com') &&
-        (loginPass === 'super2024' || loginPass === 'mccmrfip123')
+        (loginPass === 'super2024')
       ) {
         const superUser = {
           id: 1,
@@ -83,7 +84,7 @@ export default function AdminLoginPage() {
 
       if (
         (loginId === 'MCCMRFIP@admin' || loginId === 'admin@mccmrfip.com') &&
-        (loginPass === 'Novara2024' || loginPass === 'mccmrfip123')
+        (loginPass === 'Novara2024')
       ) {
         const adminUser = {
           id: 2,

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, Download, ArrowLeft, Receipt, ShieldCheck } from 'lucide-react';
+import { API_BASE_URL } from '../utils/apiConfig';
 import '../styles/global.css';
 
 export default function PaymentSuccessPage() {
@@ -12,8 +13,44 @@ export default function PaymentSuccessPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Immediately synchronize local storage so Returning to Dashboard is instantly cleared
+    try {
+      const storedComp = localStorage.getItem('currentCompany');
+      if (storedComp) {
+        const comp = JSON.parse(storedComp);
+        if (comp.payments && comp.payments.length > 0) {
+          comp.payments = comp.payments.map((p) => {
+            if (p.txnid === txnid || p.status === 'Pending' || p.status === 'PENDING') {
+              return { ...p, status: 'Paid', payment_status: 'PAID' };
+            }
+            return p;
+          });
+        }
+        localStorage.setItem('currentCompany', JSON.stringify(comp));
+      }
+
+      const localPayments = JSON.parse(localStorage.getItem('company_payments') || '[]');
+      const updatedLocal = localPayments.map((p) => {
+        if (p.txnid === txnid || p.status === 'Pending' || p.status === 'PENDING') {
+          return { ...p, status: 'Paid', payment_status: 'PAID' };
+        }
+        return p;
+      });
+      if (!updatedLocal.some((p) => p.txnid === txnid)) {
+        updatedLocal.unshift({
+          txnid,
+          status: 'Paid',
+          payment_status: 'PAID',
+          date: new Date().toLocaleDateString('en-GB')
+        });
+      }
+      localStorage.setItem('company_payments', JSON.stringify(updatedLocal));
+    } catch (e) {
+      console.warn('Syncing localStorage in PaymentSuccessPage:', e);
+    }
+
     // Verify transaction status with backend
-    fetch('http://localhost:5000/api/payments/payu/verify', {
+    fetch(`${API_BASE_URL}/api/payments/payu/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ txnid })
@@ -62,15 +99,15 @@ export default function PaymentSuccessPage() {
             </div>
           </div>
 
-          <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', marginBottom: '28px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', fontSize: '13.5px' }}>
+          <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+            <div className="payment-receipt-summary-grid">
               <div>
                 <div style={{ color: '#64748B', fontSize: '12px', fontWeight: '600' }}>Transaction ID</div>
-                <div style={{ color: '#0F172A', fontWeight: '700', fontFamily: 'monospace', marginTop: '2px' }}>{txnid}</div>
+                <div style={{ color: '#0F172A', fontWeight: '700', fontFamily: 'monospace', marginTop: '2px', wordBreak: 'break-all' }}>{txnid}</div>
               </div>
               <div>
                 <div style={{ color: '#64748B', fontSize: '12px', fontWeight: '600' }}>PayU Reference ID</div>
-                <div style={{ color: '#0F172A', fontWeight: '700', fontFamily: 'monospace', marginTop: '2px' }}>{payuid}</div>
+                <div style={{ color: '#0F172A', fontWeight: '700', fontFamily: 'monospace', marginTop: '2px', wordBreak: 'break-all' }}>{payuid}</div>
               </div>
               <div>
                 <div style={{ color: '#64748B', fontSize: '12px', fontWeight: '600' }}>Payment Gateway</div>

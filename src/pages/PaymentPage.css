@@ -119,18 +119,12 @@
   margin: 0;
 }
 
-/* 2-COLUMN GRID */
+/* SINGLE / CENTERED COLUMN GRID */
 .payment-layout-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  align-items: start;
-}
-
-@media (max-width: 868px) {
-  .payment-layout-grid {
-    grid-template-columns: 1fr;
-  }
+  display: flex;
+  justify-content: center;
+  max-width: 620px;
+  margin: 0 auto;
 }
 
 /* CARDS */
@@ -791,15 +785,483 @@
   cursor: not-allowed;
 }
 
-.gateway-modal-footer {
-  background-color: #F8FAFC;
-  border-top: 1px solid #E2E8F0;
-  padding: 0.75rem;
-  font-size: 0.78rem;
-  color: #64748B;
+/* PAYU BRANDED HOSTED CHECKOUT GATEWAY MODAL (MATCHING SCREENSHOT DESIGN) */
+.payu-checkout-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 99999;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  padding: 1.5rem;
+}
+
+.payu-checkout-card {
+  width: 100%;
+  max-width: 940px;
+  height: 640px;
+  max-height: 92vh;
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+  display: flex;
+  border: 1px solid #E2E8F0;
+}
+
+@media (max-width: 840px) {
+  .payu-checkout-overlay {
+    padding: 0.75rem;
+  }
+
+  .payu-checkout-card {
+    flex-direction: column;
+    height: auto;
+    max-height: 96vh;
+    overflow-y: auto;
+    border-radius: 12px;
+  }
+
+  .payu-left-sidebar {
+    width: 100%;
+    padding: 1.25rem 1rem;
+  }
+
+  .payu-top-bar {
+    padding: 0.85rem 1rem;
+  }
+
+  .payu-methods-container {
+    padding: 1rem 0.85rem;
+  }
+
+  .payu-bottom-bar {
+    padding: 0.85rem 1rem;
+  }
+
+  .payu-payable-amount {
+    font-size: 1.55rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .payu-checkout-overlay {
+    padding: 0.35rem;
+  }
+
+  .payu-checkout-card {
+    border-radius: 8px;
+  }
+
+  .payu-left-sidebar {
+    padding: 1rem 0.75rem;
+  }
+
+  .payu-pay-now-btn {
+    padding: 0.65rem 1rem;
+    font-size: 0.84rem;
+  }
+}
+
+/* LEFT SIDEBAR */
+.payu-left-sidebar {
+  width: 340px;
+  background-color: #062D2B;
+  color: #FFFFFF;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.payu-brand-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.payu-crest-wrapper {
+  background-color: #FFFFFF;
+  padding: 4px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payu-crest-img {
+  height: 38px;
+  width: auto;
+}
+
+.payu-merchant-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  margin: 0 0 2px 0;
+}
+
+.payu-test-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  background-color: rgba(34, 197, 94, 0.2);
+  color: #4ADE80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.payu-payable-block {
+  margin-top: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.payu-payable-label {
+  font-size: 0.82rem;
+  color: #A7F3D0;
   font-weight: 600;
+}
+
+.payu-payable-amount {
+  font-size: 1.85rem;
+  font-weight: 900;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.payu-chevron-icon {
+  font-size: 1.1rem;
+  color: #6EE7B7;
+}
+
+.payu-details-card {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.payu-details-header {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.payu-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.payu-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+}
+
+.detail-label { color: #94A3B8; }
+.detail-val { color: #F8FAFC; font-weight: 700; }
+
+.payu-security-box {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.payu-sidebar-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 0.85rem;
+}
+
+.payu-compliance-text {
+  font-size: 0.7rem;
+  color: #64748B;
+  margin-bottom: 0.5rem;
+}
+
+.payu-logos-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+
+.logo-badge {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #CBD5E1;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.payu-copyright {
+  font-size: 0.68rem;
+  color: #475569;
+}
+
+/* RIGHT MAIN PANEL */
+.payu-right-panel {
+  flex: 1;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.payu-top-bar {
+  padding: 1rem 1.75rem;
+  border-bottom: 1px solid #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.payu-logo-text {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #22C55E;
+  letter-spacing: -0.04em;
+}
+
+.payu-logo-u {
+  color: #0F172A;
+}
+
+.payu-lock-text {
+  font-size: 0.78rem;
+  color: #64748B;
+  font-weight: 600;
+  margin-left: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.payu-lang-select {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.payu-modal-close {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.payu-modal-close:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+}
+
+.payu-content-body {
+  padding: 1.5rem 1.75rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.payu-options-heading {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 1.25rem 0;
+}
+
+.payu-section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin-bottom: 0.75rem;
+}
+
+.payu-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.payu-option-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: #FFFFFF;
+}
+
+.payu-option-card:hover {
+  border-color: #059669;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.08);
+}
+
+.payu-option-card.selected {
+  border: 2px solid #059669;
+  background-color: #F0FDF4;
+}
+
+.payu-option-card.muted {
+  background-color: #FAFAFA;
+}
+
+.payu-option-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.option-icon-box {
+  width: 38px;
+  height: 38px;
+  background-color: #F1F5F9;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.option-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.option-subtitle {
+  font-size: 0.78rem;
+  color: #64748B;
+  margin-top: 1px;
+}
+
+.option-badges-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.card-brand-pill {
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid #CBD5E1;
+}
+
+.card-brand-pill.visa { color: #1A1F71; background-color: #EEF2FF; }
+.card-brand-pill.master { color: #EB001B; background-color: #FEF2F2; }
+.card-brand-pill.rupay { color: #008346; background-color: #F0FDF4; }
+
+.upi-brand-pill {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.upi-brand-pill.gpay { background-color: #E8F0FE; color: #1A73E8; }
+.upi-brand-pill.phonepe { background-color: #F3E8FF; color: #5F259F; }
+.upi-brand-pill.paytm { background-color: #E0F2FE; color: #0284C7; }
+.upi-brand-pill.bhim { background-color: #FEF3C7; color: #D97706; }
+
+.payu-secure-banner {
+  background-color: #F0FDF4;
+  border: 1px solid #A7F3D0;
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.banner-lock-circle {
+  width: 36px;
+  height: 36px;
+  background-color: #DCFCE7;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.banner-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #166534;
+}
+
+.banner-sub {
+  font-size: 0.75rem;
+  color: #15803D;
+}
+
+/* BOTTOM FIXED ACTION BAR */
+.payu-bottom-bar {
+  padding: 1rem 1.75rem;
+  border-top: 1px solid #E2E8F0;
+  background-color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.payu-cancel-btn {
+  background: transparent;
+  border: none;
+  color: #2563EB;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.payu-cancel-btn:hover {
+  text-decoration: underline;
+}
+
+.payu-pay-now-btn {
+  background-color: #16A34A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+  transition: all 0.2s ease;
+}
+
+.payu-pay-now-btn:hover {
+  background-color: #15803D;
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
 }

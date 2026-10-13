@@ -28,6 +28,7 @@ import {
   Line
 } from 'recharts';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -47,10 +48,10 @@ export default function AdminDashboardPage() {
 
       try {
         const [statsRes, revRes, compRes, payRes] = await Promise.all([
-          fetch('http://localhost:5000/api/dashboard/stats', { headers }),
-          fetch('http://localhost:5000/api/dashboard/revenue', { headers }),
-          fetch('http://localhost:5000/api/dashboard/recent-companies', { headers }),
-          fetch('http://localhost:5000/api/dashboard/recent-payments', { headers })
+          fetch(`${API_BASE_URL}/api/dashboard/stats`, { headers }),
+          fetch(`${API_BASE_URL}/api/dashboard/revenue`, { headers }),
+          fetch(`${API_BASE_URL}/api/dashboard/recent-companies`, { headers }),
+          fetch(`${API_BASE_URL}/api/dashboard/recent-payments`, { headers })
         ]);
 
         const statsData = await statsRes.json();
@@ -232,7 +233,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* 2. ANALYTICS CHARTS ROW */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+      <div className="admin-analytics-grid">
         {/* Revenue Overview Bar Chart */}
         <div className="admin-card">
           <div className="admin-card-header">
@@ -294,7 +295,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* 3. RECENT TABLES ROW */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      <div className="admin-dual-grid">
         {/* Recent Companies */}
         <div className="admin-table-wrapper">
           <div className="admin-table-toolbar">

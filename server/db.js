@@ -1,4 +1,6 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
@@ -243,8 +245,7 @@ const INITIAL_PLACES = [
 const INITIAL_MENUS = [
   { id: 1, title: 'Home', url: '/', parent_id: null, display_order: 1, status: 'Active' },
   { id: 2, title: 'About Us', url: '/#about', parent_id: null, display_order: 2, status: 'Active' },
-  { id: 3, title: 'Services', url: '/#services', parent_id: null, display_order: 3, status: 'Active' },
-  { id: 4, title: 'Contact', url: '/#contact', parent_id: null, display_order: 4, status: 'Active' }
+  { id: 3, title: 'Services', url: '/#services', parent_id: null, display_order: 3, status: 'Active' }
 ];
 
 const INITIAL_FOOTER_SETTINGS = {
@@ -298,7 +299,7 @@ const INITIAL_PERMISSIONS = [
 ];
 
 // Fallback in-memory stores
-let inMemoryCompanies = INITIAL_COMPANIES.map(c => ({ ...c, password: 'Mccmrfip@2025' }));
+let inMemoryCompanies = INITIAL_COMPANIES.map(c => ({ ...c, password: 'Mccmrfip@123' }));
 let inMemoryTransactions = [...INITIAL_TRANSACTIONS];
 let inMemoryPlaces = [...INITIAL_PLACES];
 let inMemoryMenus = [...INITIAL_MENUS];
@@ -310,7 +311,7 @@ let inMemoryPermissions = [...INITIAL_PERMISSIONS];
 let inMemoryAuditLogs = [];
 let inMemoryPayments = [];
 let inMemoryEmailLogs = [];
-const DEFAULT_COMPANY_PASSWORD_HASH = bcrypt.hashSync('Mccmrfip@2025', 10);
+const DEFAULT_COMPANY_PASSWORD_HASH = bcrypt.hashSync('Mccmrfip@123', 10);
 
 let inMemoryUsers = [
   {
@@ -359,6 +360,7 @@ let inMemoryUsers = [
 ];
 
 let inMemorySmtpSettings = [];
+let inMemoryInvoices = [];
 let useInMemory = false;
 let dbPool = null;
 let dbConnectionConfig = null;
@@ -495,11 +497,43 @@ async function initDb() {
       await dbPool.query(`DELETE FROM companies WHERE email LIKE 'testcompany_%' OR email = 'arun@greenhorizon.in' OR company_name = 'Green Horizon Labs' OR company_name = 'Test Innovation Era'`);
     } catch (e) {}
 
-    // Ensure s_no values start at 1 sequentially and default passwords are updated to Mccmrfip@2025
+    // Ensure INITIAL_COMPANIES are seeded into companies table if empty
+    const [compCount] = await dbPool.query(`SELECT COUNT(*) as cnt FROM companies`);
+    if (compCount[0].cnt === 0) {
+      for (const comp of INITIAL_COMPANIES) {
+        await dbPool.query(
+          `INSERT INTO companies (id, s_no, contact_person, company_name, contact_number, email, password, interns_count, workers_count, monthly_rate, incubation_date, gst_number, place, business_description, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            comp.id,
+            comp.s_no,
+            comp.contact_person,
+            comp.company_name,
+            comp.contact_number,
+            comp.email,
+            comp.password || 'Mccmrfip@2025',
+            comp.interns_count || 0,
+            comp.workers_count || 0,
+            comp.monthly_rate || 10000,
+            comp.incubation_date || '2024-11-22',
+            comp.gst_number || '',
+            comp.place || '',
+            comp.business_description || '',
+            comp.status || 'Approved'
+          ]
+        );
+      }
+    }
+
+    // Ensure s_no values start at 1 sequentially and default passwords are updated to Mccmrfip@123
     for (const comp of INITIAL_COMPANIES) {
       await dbPool.query(`UPDATE companies SET s_no = ? WHERE id = ?`, [comp.s_no, comp.id]);
     }
-    await dbPool.query(`UPDATE companies SET password = 'Mccmrfip@2025'`);
+    await dbPool.query(`UPDATE companies SET password = 'Mccmrfip@123' WHERE password IS NULL OR password = '' OR password = 'Mccmrfip@2025'`);
+    await dbPool.query(`UPDATE users SET password_hash = ? WHERE password_hash = ?`, [
+      bcrypt.hashSync('Mccmrfip@123', 10),
+      '$2b$10$JtJOikAb7D/oLpirk3KExOqbqPaVVZgusjTINH2.ZHD3IHokpqt0O'
+    ]);
 
     // 5. Invoices Table
     await dbPool.query(`
@@ -589,7 +623,12 @@ async function initDb() {
       "ADD COLUMN customer_phone VARCHAR(50)",
       "ADD COLUMN razorpay_order_id VARCHAR(100)",
       "ADD COLUMN razorpay_payment_id VARCHAR(100)",
-      "ADD COLUMN razorpay_signature VARCHAR(255)"
+      "ADD COLUMN razorpay_signature VARCHAR(255)",
+      "ADD COLUMN transaction_id VARCHAR(100)",
+      "ADD COLUMN payment_gateway VARCHAR(50) DEFAULT 'RAZORPAY'",
+      "ADD COLUMN payu_transaction_id VARCHAR(100)",
+      "ADD COLUMN payu_payment_id VARCHAR(100)",
+      "ADD COLUMN failure_reason TEXT"
     ];
 
     for (const colClause of alterColumns) {
@@ -701,6 +740,31 @@ async function initDb() {
       );
     `);
 
+    // 11. Payment Gateway Settings Table
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS payment_gateway_settings (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        gateway_name VARCHAR(100) UNIQUE NOT NULL,
+        status VARCHAR(50) DEFAULT 'ACTIVE',
+        environment VARCHAR(50) DEFAULT 'test',
+        merchant_key VARCHAR(255) NOT NULL,
+        merchant_salt VARCHAR(255) NOT NULL,
+        allowed_methods TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed default PayU settings if not existing
+    try {
+      await dbPool.query(`
+        INSERT IGNORE INTO payment_gateway_settings (gateway_name, status, environment, merchant_key, merchant_salt, allowed_methods)
+        VALUES ('PayU India', 'ACTIVE', 'test', '7kml0E', 'RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx', '["UPI", "CARD"]')
+      `);
+    } catch (seedGatewayErr) {
+      // Ignored
+    }
+
     // Seed Roles if empty or missing
     for (const r of INITIAL_ROLES) {
       await dbPool.query(`INSERT IGNORE INTO roles (id, name, description) VALUES (?, ?, ?)`, [r.id, r.name, r.description]);
@@ -788,12 +852,36 @@ async function initDb() {
       }
     }
 
+    try {
+      // Sync admin_transactions with any verified PAID records in payments table
+      const [paidPayments] = await dbPool.query(
+        `SELECT * FROM payments WHERE payment_status = 'PAID' OR status = 'PAID'`
+      );
+      for (const pp of paidPayments) {
+        let compName = pp.company_name;
+        if (!compName && pp.company_id) {
+          const [cr] = await dbPool.query(`SELECT company_name FROM companies WHERE id = ?`, [pp.company_id]);
+          if (cr && cr[0]) compName = cr[0].company_name;
+        }
+        if (compName) {
+          await dbPool.query(
+            `UPDATE admin_transactions SET status = 'Paid', method = COALESCE(?, method), txnid = COALESCE(?, txnid) WHERE LOWER(company_name) = LOWER(?) AND (status = 'Pending' OR status = 'Overdue' OR status = 'PENDING')`,
+            [pp.payment_method || 'PayU (UPI)', pp.transaction_id || pp.payu_transaction_id, compName]
+          );
+        }
+      }
+    } catch (syncErr) {
+      console.warn('Note syncing admin_transactions on initDb:', syncErr.message);
+    }
+
     // Seed Menus if empty
     const [mRows] = await dbPool.query(`SELECT COUNT(*) as count FROM menus`);
     if (mRows[0].count === 0) {
       for (const m of INITIAL_MENUS) {
         await dbPool.query(`INSERT INTO menus (id, title, url, parent_id, display_order, status) VALUES (?, ?, ?, ?, ?, ?)`, [m.id, m.title, m.url, m.parent_id, m.display_order, m.status]);
       }
+    } else {
+      await dbPool.query(`DELETE FROM menus WHERE LOWER(title) = 'contact' OR LOWER(url) LIKE '%contact%'`);
     }
 
     // Seed Footer Settings if empty
@@ -1176,7 +1264,8 @@ const db = {
     if (useInMemory) return inMemoryCompanies.find((c) => Number(c.id) === Number(id)) || null;
     try {
       const [rows] = await dbPool.query(`SELECT * FROM companies WHERE id = ?`, [id]);
-      return rows[0] || null;
+      if (rows && rows[0]) return rows[0];
+      return inMemoryCompanies.find((c) => Number(c.id) === Number(id)) || null;
     } catch (err) {
       return inMemoryCompanies.find((c) => Number(c.id) === Number(id)) || null;
     }
@@ -1322,6 +1411,25 @@ const db = {
       return db.getCompanyById(id);
     } catch (err) {
       console.error('Error updating company password:', err);
+      throw err;
+    }
+  },
+
+  async updateCompanyPasswordByEmail(email, newPassword) {
+    if (!email) return null;
+    if (useInMemory) {
+      const index = inMemoryCompanies.findIndex((c) => c.email && c.email.toLowerCase() === email.toLowerCase());
+      if (index !== -1) {
+        inMemoryCompanies[index].password = newPassword;
+        return inMemoryCompanies[index];
+      }
+      return null;
+    }
+    try {
+      await dbPool.query(`UPDATE companies SET password = ? WHERE LOWER(email) = LOWER(?)`, [newPassword, email]);
+      return db.getCompanyByEmail(email);
+    } catch (err) {
+      console.error('Error updating company password by email:', err);
       throw err;
     }
   },
@@ -1522,6 +1630,14 @@ const db = {
       if (idx !== -1) {
         inMemoryUsers[idx].password_hash = newPasswordHash;
         if (clearMustChange) inMemoryUsers[idx].must_change_password = false;
+
+        const userEmail = (inMemoryUsers[idx].email || '').toLowerCase();
+        const compIdx = inMemoryCompanies.findIndex(
+          (c) => (c.id && Number(c.id) === Number(inMemoryUsers[idx].company_id)) || (c.email && c.email.toLowerCase() === userEmail)
+        );
+        if (compIdx !== -1) {
+          inMemoryCompanies[compIdx].must_change_password = !clearMustChange;
+        }
         return inMemoryUsers[idx];
       }
       return null;
@@ -1532,6 +1648,18 @@ const db = {
         `UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?`,
         [newPasswordHash, mustChangeVal, userId]
       );
+      try {
+        const [uRows] = await dbPool.query(`SELECT company_id, email FROM users WHERE id = ?`, [userId]);
+        if (uRows.length > 0) {
+          const { company_id, email } = uRows[0];
+          await dbPool.query(
+            `UPDATE companies SET password = ? WHERE id = ? OR LOWER(email) = LOWER(?)`,
+            [newPasswordHash, company_id || 0, email || '']
+          );
+        }
+      } catch (e) {
+        console.warn('Warning updating companies table password:', e.message);
+      }
       return db.getUserById(userId);
     } catch (err) {
       console.error('Error updating user password hash:', err);
@@ -1562,16 +1690,18 @@ const db = {
 
   async getPaymentsByCompany(companyId) {
     if (useInMemory || !dbPool) {
-      return inMemoryPayments.filter((p) => Number(p.company_id) === Number(companyId));
+      const filtered = inMemoryPayments.filter((p) => Number(p.company_id) === Number(companyId));
+      return filtered.slice(-10);
     }
     try {
       const [rows] = await dbPool.query(
-        `SELECT * FROM payments WHERE company_id = ? ORDER BY id DESC`,
+        `SELECT * FROM payments WHERE company_id = ? ORDER BY id DESC LIMIT 10`,
         [companyId]
       );
       return rows || [];
     } catch (err) {
-      return inMemoryPayments.filter((p) => Number(p.company_id) === Number(companyId));
+      const filtered = inMemoryPayments.filter((p) => Number(p.company_id) === Number(companyId));
+      return filtered.slice(-10);
     }
   },
 
@@ -1579,20 +1709,71 @@ const db = {
     id: 1,
     gateway_name: 'PayU India',
     status: 'ACTIVE',
-    environment: process.env.PAYU_ENVIRONMENT || 'test',
-    merchant_key: process.env.PAYU_MERCHANT_KEY || 'gtK2yq',
-    merchant_salt: process.env.PAYU_MERCHANT_SALT || 'eCwTwB0s',
+    environment: (process.env.PAYU_ENVIRONMENT || 'test').trim(),
+    merchant_key: (process.env.PAYU_MERCHANT_KEY || '').trim(),
+    merchant_salt: (process.env.PAYU_MERCHANT_SALT || '').trim(),
     allowed_methods: ['UPI', 'CARD']
   },
 
+  async ensurePaymentGatewayTable() {
+    if (useInMemory || !dbPool) return;
+    try {
+      await dbPool.query(`
+        CREATE TABLE IF NOT EXISTS payment_gateway_settings (
+          id INT PRIMARY KEY AUTO_INCREMENT,
+          gateway_name VARCHAR(100) UNIQUE NOT NULL,
+          status VARCHAR(50) DEFAULT 'ACTIVE',
+          environment VARCHAR(50) DEFAULT 'test',
+          merchant_key VARCHAR(255) NOT NULL,
+          merchant_salt VARCHAR(255) NOT NULL,
+          allowed_methods TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        );
+      `);
+    } catch (err) {
+      console.warn('Could not ensure payment_gateway_settings table:', err.message);
+    }
+  },
+
   async getPayUSetting() {
+    // If backend environment variables are set, prioritize them
+    const envKey = (process.env.PAYU_MERCHANT_KEY || '').trim();
+    const envSalt = (process.env.PAYU_MERCHANT_SALT || '').trim();
+    const envMode = (process.env.PAYU_ENVIRONMENT || 'test').trim();
+
+    if (envKey && envSalt) {
+      return {
+        id: 1,
+        gateway_name: 'PayU India',
+        status: 'ACTIVE',
+        environment: envMode,
+        merchant_key: envKey,
+        merchant_salt: envSalt,
+        allowed_methods: ['UPI', 'CARD']
+      };
+    }
+
     if (useInMemory || !dbPool) {
       return this.inMemoryPayUSettings;
     }
     try {
+      await this.ensurePaymentGatewayTable();
       const [rows] = await dbPool.query(`SELECT * FROM payment_gateway_settings WHERE gateway_name = 'PayU India' LIMIT 1`);
       if (rows && rows.length > 0) {
-        return rows[0];
+        const row = rows[0];
+        let allowedMethods = row.allowed_methods;
+        if (typeof allowedMethods === 'string') {
+          try {
+            allowedMethods = JSON.parse(allowedMethods);
+          } catch (e) {
+            allowedMethods = ['UPI', 'CARD'];
+          }
+        }
+        return {
+          ...row,
+          allowed_methods: Array.isArray(allowedMethods) ? allowedMethods : ['UPI', 'CARD']
+        };
       }
       return this.inMemoryPayUSettings;
     } catch (err) {
@@ -1601,11 +1782,16 @@ const db = {
   },
 
   async savePayUSetting({ environment, merchantKey, merchantSalt, allowedMethods }) {
+    const current = await this.getPayUSetting();
+    const effectiveKey = merchantKey && merchantKey.trim() ? merchantKey.trim() : (process.env.PAYU_MERCHANT_KEY || current?.merchant_key || '');
+    const isMaskedSalt = !merchantSalt || merchantSalt.includes('*') || !merchantSalt.trim();
+    const effectiveSalt = isMaskedSalt ? (process.env.PAYU_MERCHANT_SALT || current?.merchant_salt || '') : merchantSalt.trim();
+
     this.inMemoryPayUSettings = {
       ...this.inMemoryPayUSettings,
-      environment: environment || 'test',
-      merchant_key: merchantKey || this.inMemoryPayUSettings.merchant_key,
-      merchant_salt: merchantSalt || this.inMemoryPayUSettings.merchant_salt,
+      environment: environment || process.env.PAYU_ENVIRONMENT || 'test',
+      merchant_key: effectiveKey,
+      merchant_salt: effectiveSalt,
       allowed_methods: allowedMethods || ['UPI', 'CARD']
     };
 
@@ -1614,11 +1800,12 @@ const db = {
     }
 
     try {
+      await this.ensurePaymentGatewayTable();
       await dbPool.query(
         `INSERT INTO payment_gateway_settings (gateway_name, status, environment, merchant_key, merchant_salt, allowed_methods)
          VALUES ('PayU India', 'ACTIVE', ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE environment = VALUES(environment), merchant_key = VALUES(merchant_key), merchant_salt = VALUES(merchant_salt), allowed_methods = VALUES(allowed_methods)`,
-        [environment || 'test', merchantKey, merchantSalt, JSON.stringify(allowedMethods || ['UPI', 'CARD'])]
+        [environment || 'test', effectiveKey, effectiveSalt, JSON.stringify(allowedMethods || ['UPI', 'CARD'])]
       );
       return this.getPayUSetting();
     } catch (err) {
@@ -1670,6 +1857,7 @@ const db = {
     if (pIndex !== -1) {
       inMemoryPayments[pIndex] = {
         ...inMemoryPayments[pIndex],
+        status: status === 'PAID' ? 'PAID' : status,
         payment_status: status,
         payu_payment_id: payuPaymentId || inMemoryPayments[pIndex].payu_payment_id,
         payment_method: paymentMethod || inMemoryPayments[pIndex].payment_method,
@@ -1678,21 +1866,113 @@ const db = {
       };
     }
 
+    // Sync inMemoryTransactions array
+    const targetStatus = (status === 'PAID' || status === 'SUCCESS') ? 'Paid' : status;
+    const tIndex = inMemoryTransactions.findIndex((t) => t.txnid === transactionId || t.id === transactionId);
+    if (tIndex !== -1) {
+      inMemoryTransactions[tIndex].status = targetStatus;
+    } else {
+      // If transactionId is not direct match, check if any pending transaction exists for company
+      if (pIndex !== -1 && inMemoryPayments[pIndex].company_name) {
+        const compTxn = inMemoryTransactions.find(t => t.company_name === inMemoryPayments[pIndex].company_name && (t.status === 'Pending' || t.status === 'Overdue'));
+        if (compTxn) compTxn.status = targetStatus;
+      }
+    }
+
     if (useInMemory || !dbPool) {
       return inMemoryPayments[pIndex] || null;
     }
 
     try {
       await dbPool.query(
-        `UPDATE payments SET payment_status = ?, payu_payment_id = ?, payment_method = ?, failure_reason = ?, payment_date = IF(? = 'PAID', NOW(), payment_date), updated_at = NOW()
+        `UPDATE payments SET status = ?, payment_status = ?, payu_payment_id = ?, payment_method = ?, failure_reason = ?, payment_date = IF(? = 'PAID', NOW(), payment_date), updated_at = NOW()
          WHERE transaction_id = ? OR payu_transaction_id = ?`,
-        [status, payuPaymentId || null, paymentMethod || 'PayU', failureReason || null, status, transactionId, transactionId]
+        [status, status, payuPaymentId || null, paymentMethod || 'PayU', failureReason || null, status, transactionId, transactionId]
       );
+
+      if (targetStatus === 'Paid') {
+        // Find payment details to get company details
+        const [payRows] = await dbPool.query(
+          `SELECT * FROM payments WHERE transaction_id = ? OR payu_transaction_id = ? LIMIT 1`,
+          [transactionId, transactionId]
+        );
+        const pRecord = payRows && payRows[0];
+        let compName = pRecord ? pRecord.company_name : null;
+        if (!compName && pRecord && pRecord.company_id) {
+          const [cRows] = await dbPool.query(`SELECT company_name FROM companies WHERE id = ? LIMIT 1`, [pRecord.company_id]);
+          if (cRows && cRows[0]) compName = cRows[0].company_name;
+        }
+
+        let updatedTxn = false;
+        if (transactionId) {
+          const [res1] = await dbPool.query(
+            `UPDATE admin_transactions SET status = 'Paid', method = ? WHERE txnid = ?`,
+            [paymentMethod || 'PayU', transactionId]
+          );
+          if (res1 && res1.affectedRows > 0) updatedTxn = true;
+        }
+
+        if (!updatedTxn && compName) {
+          const [res2] = await dbPool.query(
+            `UPDATE admin_transactions SET status = 'Paid', method = ?, txnid = ? WHERE LOWER(company_name) = LOWER(?) AND (status = 'Pending' OR status = 'Overdue' OR status = 'PENDING') LIMIT 1`,
+            [paymentMethod || 'PayU', transactionId, compName]
+          );
+          if (res2 && res2.affectedRows > 0) updatedTxn = true;
+        }
+
+        if (!updatedTxn && compName && pRecord) {
+          const amt = Number(pRecord.amount || 0);
+          const gst = Math.round(amt * 0.18);
+          const total = amt + gst;
+          const todayDate = new Date().toLocaleDateString('en-GB');
+          await dbPool.query(
+            `INSERT INTO admin_transactions (date, txnid, company_name, month, amount, gst, total, method, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Paid')`,
+            [todayDate, transactionId, compName, pRecord.month_year || 'Current Month', amt, gst, total, paymentMethod || 'PayU']
+          );
+        }
+      }
+
       const [rows] = await dbPool.query(`SELECT * FROM payments WHERE transaction_id = ? OR payu_transaction_id = ? LIMIT 1`, [transactionId, transactionId]);
       return rows && rows.length > 0 ? rows[0] : (inMemoryPayments[pIndex] || null);
     } catch (err) {
       console.warn('Error updating PayU payment status in DB:', err.message);
       return inMemoryPayments[pIndex] || null;
+    }
+  },
+
+  async syncAdminTransactionToPaid(companyName, txnid, month) {
+    if (!companyName) return;
+    try {
+      if (dbPool) {
+        await dbPool.query(
+          `UPDATE admin_transactions SET status = 'Paid' WHERE LOWER(company_name) = LOWER(?) AND (status = 'Pending' OR status = 'Overdue' OR status = 'PENDING')`,
+          [companyName]
+        );
+      }
+      const tIndex = inMemoryTransactions.findIndex(
+        (t) => t.company_name && t.company_name.toLowerCase() === companyName.toLowerCase() && (t.status === 'Pending' || t.status === 'Overdue')
+      );
+      if (tIndex !== -1) {
+        inMemoryTransactions[tIndex].status = 'Paid';
+      }
+    } catch (e) {
+      console.warn('syncAdminTransactionToPaid error:', e.message);
+    }
+  },
+
+  async updateInvoiceStatus(invoiceId, status = 'PAID') {
+    if (!invoiceId) return null;
+    if (useInMemory || !dbPool) {
+      return { id: invoiceId, status };
+    }
+    try {
+      await dbPool.query(`UPDATE invoices SET status = ?, updated_at = NOW() WHERE id = ?`, [status, invoiceId]);
+      const [rows] = await dbPool.query(`SELECT * FROM invoices WHERE id = ? LIMIT 1`, [invoiceId]);
+      return rows && rows.length > 0 ? rows[0] : { id: invoiceId, status };
+    } catch (err) {
+      console.warn('Error updating invoice status in DB:', err.message);
+      return { id: invoiceId, status };
     }
   },
 
@@ -2185,12 +2465,13 @@ const db = {
   // MENUS & FOOTER CRUD
   // ==========================================
   async getMenus() {
-    if (useInMemory) return [...inMemoryMenus];
+    const filterContact = (list) => (list || []).filter((m) => (m.title || '').toLowerCase().trim() !== 'contact' && !(m.url || '').toLowerCase().includes('contact'));
+    if (useInMemory) return filterContact(inMemoryMenus);
     try {
       const [rows] = await dbPool.query(`SELECT * FROM menus ORDER BY display_order ASC, id ASC`);
-      return rows;
+      return filterContact(rows);
     } catch (err) {
-      return [...inMemoryMenus];
+      return filterContact(inMemoryMenus);
     }
   },
 

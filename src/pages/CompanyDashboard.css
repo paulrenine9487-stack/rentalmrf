@@ -365,8 +365,43 @@
 
 /* 3. MOBILE (≤ 767px): 1 Column stacked layout */
 @media (max-width: 767px) {
+  .dashboard-header {
+    padding: 0.85rem 0;
+  }
+  .dashboard-header-container {
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+  .dashboard-brand-title {
+    font-size: 1.1rem;
+  }
+  .dashboard-brand-subtitle {
+    font-size: 0.75rem;
+  }
+  .dashboard-user-nav {
+    gap: 0.75rem;
+    width: 100%;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 0.5rem;
+  }
+  .welcome-text {
+    font-size: 0.84rem;
+  }
+  .logout-btn {
+    padding: 0.3rem 0.85rem;
+    font-size: 0.82rem;
+  }
+  .dashboard-main {
+    padding: 1.5rem 0 3rem 0;
+  }
   .dashboard-grid {
     grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .dashboard-card {
+    padding: 1.25rem 1rem;
+    border-radius: 12px;
   }
   .history-card-col {
     grid-column: 1 / -1;
@@ -375,11 +410,46 @@
     grid-template-columns: 1fr;
   }
   .dashboard-title {
-    font-size: 1.85rem;
+    font-size: 1.65rem;
+  }
+  .dashboard-subtitle {
+    font-size: 0.88rem;
+  }
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.65rem 0;
+  }
+  .info-value {
+    word-break: break-word;
   }
   .dashboard-footer-grid {
     flex-direction: column;
     gap: 2rem;
+  }
+  .modal-overlay {
+    padding: 0.65rem;
+  }
+  .payment-gateway-modal {
+    max-height: 94vh;
+  }
+  .payment-gateway-body {
+    padding: 1rem 0.85rem;
+  }
+  .months-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+  }
+  .profile-modal-container {
+    width: 100%;
+    max-height: 94vh;
+  }
+  .profile-modal-body {
+    padding: 1.25rem 1rem;
+  }
+  .profile-modal-footer {
+    padding: 0.85rem 1rem;
   }
 }
 

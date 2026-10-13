@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, Search, Edit2, Trash2, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function PlacesPage() {
   const [places, setPlaces] = useState([]);
@@ -42,7 +43,7 @@ export default function PlacesPage() {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
-      const res = await fetch('http://localhost:5000/api/places', { headers });
+      const res = await fetch(`${API_BASE_URL}/api/places`, { headers });
       const data = await res.json();
       if (data.success) {
         setPlaces(data.places || []);
@@ -61,7 +62,7 @@ export default function PlacesPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch('http://localhost:5000/api/places', {
+      const res = await fetch(`${API_BASE_URL}/api/places`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,7 +93,7 @@ export default function PlacesPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/places/${selectedPlace.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/places/${selectedPlace.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +123,7 @@ export default function PlacesPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch(`http://localhost:5000/api/places/${selectedPlace.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/places/${selectedPlace.id}`, {
         method: 'DELETE',
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
@@ -300,7 +301,7 @@ export default function PlacesPage() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="modal-form-grid">
                   <div className="profile-field-group">
                     <label className="profile-field-label">Capacity (Persons)</label>
                     <input
@@ -383,7 +384,7 @@ export default function PlacesPage() {
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="modal-form-grid">
                   <div className="profile-field-group">
                     <label className="profile-field-label">Capacity</label>
                     <input

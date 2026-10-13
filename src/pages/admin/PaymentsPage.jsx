@@ -12,6 +12,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState([]);
@@ -36,7 +37,7 @@ export default function PaymentsPage() {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
-      const res = await fetch('http://localhost:5000/api/payments', { headers });
+      const res = await fetch(`${API_BASE_URL}/api/payments`, { headers });
       const data = await res.json();
       if (data.success) {
         setPayments(data.payments || []);
@@ -344,7 +345,7 @@ export default function PaymentsPage() {
               </button>
             </div>
             <div className="profile-modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.9rem' }}>
+              <div className="modal-form-grid" style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>
                 <div>
                   <span style={{ color: 'var(--admin-text-secondary)', fontSize: '0.8rem' }}>Company Name</span>
                   <div style={{ fontWeight: 700, color: 'var(--admin-primary)' }}>{selectedPayment.company_name}</div>

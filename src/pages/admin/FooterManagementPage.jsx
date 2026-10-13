@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutTemplate, Plus, Edit2, Trash2, X, AlertTriangle, CheckCircle2, Save, Share2 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function FooterManagementPage() {
   const [footerSettings, setFooterSettings] = useState({
@@ -36,7 +37,7 @@ export default function FooterManagementPage() {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
-      const res = await fetch('http://localhost:5000/api/footer', { headers });
+      const res = await fetch(`${API_BASE_URL}/api/footer`, { headers });
       const data = await res.json();
       if (data.success && data.footerData) {
         if (data.footerData.settings) setFooterSettings(data.footerData.settings);
@@ -54,7 +55,7 @@ export default function FooterManagementPage() {
 
     const token = localStorage.getItem('adminToken');
     try {
-      const res = await fetch('http://localhost:5000/api/footer', {
+      const res = await fetch(`${API_BASE_URL}/api/footer`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -106,8 +107,8 @@ export default function FooterManagementPage() {
     const token = localStorage.getItem('adminToken');
     const isEdit = Boolean(editingSocial);
     const url = isEdit
-      ? `http://localhost:5000/api/footer/social/${editingSocial.id}`
-      : 'http://localhost:5000/api/footer/social';
+      ? `${API_BASE_URL}/api/footer/social/${editingSocial.id}`
+      : `${API_BASE_URL}/api/footer/social`;
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
@@ -137,7 +138,7 @@ export default function FooterManagementPage() {
     if (!window.confirm('Are you sure you want to delete this social media link?')) return;
     const token = localStorage.getItem('adminToken');
     try {
-      await fetch(`http://localhost:5000/api/footer/social/${id}`, {
+      await fetch(`${API_BASE_URL}/api/footer/social/${id}`, {
         method: 'DELETE',
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) }
       });
@@ -149,7 +150,7 @@ export default function FooterManagementPage() {
     const token = localStorage.getItem('adminToken');
     const newStatus = item.status === 'Active' ? 'Inactive' : 'Active';
     try {
-      await fetch(`http://localhost:5000/api/footer/social/${item.id}`, {
+      await fetch(`${API_BASE_URL}/api/footer/social/${item.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -180,7 +181,7 @@ export default function FooterManagementPage() {
         )}
 
         <form onSubmit={handleSettingsSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+          <div className="admin-dual-grid" style={{ marginBottom: '1.25rem' }}>
             <div className="profile-field-group">
               <label className="profile-field-label">Organization Name *</label>
               <input
@@ -384,7 +385,7 @@ export default function FooterManagementPage() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="modal-form-grid">
                   <div className="profile-field-group">
                     <label className="profile-field-label">Display Order</label>
                     <input

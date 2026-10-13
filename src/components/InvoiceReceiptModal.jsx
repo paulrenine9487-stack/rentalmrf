@@ -28,17 +28,7 @@ export default function InvoiceReceiptModal({ receiptData, onClose }) {
       onClick={onClose}
     >
       <div
-        style={{
-          width: '100%',
-          maxWidth: '680px',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '12px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          maxHeight: '90vh'
-        }}
+        className="receipt-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -107,16 +97,7 @@ export default function InvoiceReceiptModal({ receiptData, onClose }) {
           }}
         >
           {/* Top Brand Banner */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'flex-start',
-              borderBottom: '2px solid #8B0000',
-              paddingBottom: '1.25rem',
-              marginBottom: '1.5rem'
-            }}
-          >
+          <div className="receipt-banner">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <img
                 src="/mcc-crest-maroon.png"
@@ -157,7 +138,7 @@ export default function InvoiceReceiptModal({ receiptData, onClose }) {
           </div>
 
           {/* Grid Information */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div className="receipt-info-grid">
             {/* Left Column: Billed To */}
             <div
               style={{
@@ -218,28 +199,30 @@ export default function InvoiceReceiptModal({ receiptData, onClose }) {
           </div>
 
           {/* Items Table */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#8B0000', color: '#FFFFFF', textAlign: 'left', fontSize: '0.82rem', textTransform: 'uppercase' }}>
-                <th style={{ padding: '0.65rem 1rem', borderTopLeftRadius: '6px' }}>Description</th>
-                <th style={{ padding: '0.65rem 1rem' }}>Workspace</th>
-                <th style={{ padding: '0.65rem 1rem', textAlign: 'right', borderTopRightRadius: '6px' }}>Amount (INR)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{ borderBottom: '1px solid #E5E7EB', fontSize: '0.88rem' }}>
-                <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
-                  Incubation Workspace Monthly Fee ({receiptData.billing_period || 'August 2026'})
-                </td>
-                <td style={{ padding: '0.85rem 1rem', color: '#64748B' }}>
-                  {receiptData.place || 'Incubation Suite'}
-                </td>
-                <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700 }}>
-                  ₹{amountFormatted}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="receipt-table-wrapper">
+            <table style={{ width: '100%', minWidth: '450px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#8B0000', color: '#FFFFFF', textAlign: 'left', fontSize: '0.82rem', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '0.65rem 1rem', borderTopLeftRadius: '6px' }}>Description</th>
+                  <th style={{ padding: '0.65rem 1rem' }}>Workspace</th>
+                  <th style={{ padding: '0.65rem 1rem', textAlign: 'right', borderTopRightRadius: '6px' }}>Amount (INR)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #E5E7EB', fontSize: '0.88rem' }}>
+                  <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>
+                    Incubation Workspace Monthly Fee ({receiptData.billing_period || 'August 2026'})
+                  </td>
+                  <td style={{ padding: '0.85rem 1rem', color: '#64748B' }}>
+                    {receiptData.place || 'Incubation Suite'}
+                  </td>
+                  <td style={{ padding: '0.85rem 1rem', textAlign: 'right', fontWeight: 700 }}>
+                    ₹{amountFormatted}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           {/* Summary Box */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>

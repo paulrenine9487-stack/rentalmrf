@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { generateTemporaryPassword, evaluatePasswordStrength } from '../../utils/passwordGenerator';
+import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState([]);
@@ -105,8 +106,8 @@ export default function CompaniesPage() {
 
     try {
       const [compRes, placeRes] = await Promise.all([
-        fetch('http://localhost:5000/api/admin/companies', { headers }),
-        fetch('http://localhost:5000/api/places', { headers })
+        fetch(`${API_BASE_URL}/api/admin/companies`, { headers }),
+        fetch(`${API_BASE_URL}/api/places`, { headers })
       ]);
 
       const compData = await compRes.json();
@@ -196,7 +197,7 @@ export default function CompaniesPage() {
 
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     try {
-      const res = await fetch('http://localhost:5000/api/admin/companies', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -237,7 +238,7 @@ export default function CompaniesPage() {
 
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${selectedCompany.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies/${selectedCompany.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -282,7 +283,7 @@ export default function CompaniesPage() {
 
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${selectedCompany.id}/resend-credentials`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies/${selectedCompany.id}/resend-credentials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -318,7 +319,7 @@ export default function CompaniesPage() {
 
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${comp.id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies/${comp.id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -345,7 +346,7 @@ export default function CompaniesPage() {
 
     const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${selectedCompany.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies/${selectedCompany.id}`, {
         method: 'DELETE',
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -384,6 +385,9 @@ export default function CompaniesPage() {
     return matchesSearch && matchesPlace && matchesStatus && matchesLoginStatus;
   });
 
+  const totalPages = Math.ceil(filteredCompanies.length / itemsPerPage) || 1;
+  const currentRecords = filteredCompanies.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const handleSendRentAlert = async (comp) => {
     if (!window.confirm(`Send urgent rent payment alert email to ${comp.company_name} (${comp.email})?`)) {
       return;
@@ -391,7 +395,7 @@ export default function CompaniesPage() {
 
     try {
       const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/admin/companies/${comp.id}/send-rent-alert`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies/${comp.id}/send-rent-alert`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -417,7 +421,7 @@ export default function CompaniesPage() {
 
     try {
       const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/admin/companies/auto-send-rent-alerts', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/companies/auto-send-rent-alerts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
