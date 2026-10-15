@@ -23,6 +23,7 @@ import {
   Lock
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { notify } from '../../components/common/EnterpriseNotificationSystem';
 import { generateTemporaryPassword, evaluatePasswordStrength } from '../../utils/passwordGenerator';
 import { API_BASE_URL } from '../../utils/apiConfig';
 
@@ -330,12 +331,13 @@ export default function CompaniesPage() {
       const data = await res.json();
 
       if (data.success) {
+        notify.success('Account status updated successfully', 'Status Updated');
         fetchData();
       } else {
-        alert(data.message || 'Failed to update account status.');
+        notify.error(data.message || 'Failed to update account status.', 'Update Error');
       }
     } catch (err) {
-      alert('Error updating account status.');
+      notify.error('Error updating account status.', 'Network Error');
     }
   };
 
@@ -357,13 +359,14 @@ export default function CompaniesPage() {
 
       if (data.success) {
         setShowDeleteModal(false);
+        notify.success('Company deleted successfully', 'Deleted');
         fetchData();
       } else {
-        alert(data.message || 'Failed to delete company.');
+        notify.error(data.message || 'Failed to delete company.', 'Deletion Error');
       }
     } catch (err) {
       setSubmitting(false);
-      alert('Error deleting company record.');
+      notify.error('Error deleting company record.', 'Network Error');
     }
   };
 
@@ -404,13 +407,13 @@ export default function CompaniesPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Success: Rent overdue alert email sent to ${comp.email}`);
+        notify.success(`Rent overdue alert email sent to ${comp.email}`, 'Email Sent');
       } else {
-        alert(`Error: ${data.message || 'Failed to send rent alert email.'}`);
+        notify.error(data.message || 'Failed to send rent alert email.', 'Email Error');
       }
     } catch (err) {
       console.error('Error sending rent alert email:', err);
-      alert('Network error while sending rent alert email.');
+      notify.error('Network error while sending rent alert email.', 'Network Error');
     }
   };
 
@@ -430,13 +433,18 @@ export default function CompaniesPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Automated Batch Process Complete:\nSent: ${data.sent_count} emails\nFailed: ${data.failed_count} emails`);
+        notify.alert({
+          title: 'Batch Process Complete',
+          message: `Automated rent payment alert batch completed.\nSent: ${data.sent_count} emails\nFailed: ${data.failed_count} emails`,
+          type: 'success',
+          badgeText: 'BATCH COMPLETED'
+        });
       } else {
-        alert(`Error: ${data.message || 'Automated rent alert process failed.'}`);
+        notify.error(data.message || 'Automated rent alert process failed.', 'Batch Error');
       }
     } catch (err) {
       console.error('Error running auto rent alert batch:', err);
-      alert('Network error while running automated rent alert batch process.');
+      notify.error('Network error while running automated rent alert batch process.', 'Network Error');
     }
   };
 

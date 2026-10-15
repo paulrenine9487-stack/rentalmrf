@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Lock, Edit, X, CheckCircle, AlertTriangle, XCircle, Printer, Download, ShieldCheck, CreditCard, Receipt, FileText, ChevronDown, ChevronRight, Smartphone, Send, QrCode } from 'lucide-react';
 import Footer from '../components/Footer';
 import InvoiceReceiptModal from '../components/InvoiceReceiptModal';
+import { notify } from '../components/common/EnterpriseNotificationSystem';
 import { API_BASE_URL } from '../utils/apiConfig';
 import './CompanyDashboard.css';
 
@@ -99,7 +100,18 @@ export default function CompanyDashboard() {
         console.warn('Backend server fetch error, using stored company data:', err);
         setLoading(false);
       });
-  }, []);
+
+    const handleReceiptOpenEvent = () => {
+      const paid = payments.find(p => p.status === 'Paid' || p.status === 'PAID') || (payments.length > 0 ? payments[0] : null);
+      if (paid) {
+        setSelectedReceiptData(paid);
+        setShowReceiptModal(true);
+      }
+    };
+
+    window.addEventListener('mrf:open-receipt', handleReceiptOpenEvent);
+    return () => window.removeEventListener('mrf:open-receipt', handleReceiptOpenEvent);
+  }, [payments]);
 
   const handleLogout = () => {
     localStorage.removeItem('currentCompany');
@@ -142,12 +154,12 @@ export default function CompanyDashboard() {
     const minAllowedMonthIdx = Math.max(0, currentCalendarMonthIdx - 1);
 
     if (index > currentCalendarMonthIdx) {
-      alert('Future months cannot be selected for advance payment.');
+      notify.warning('Future months cannot be selected for advance payment.', 'Advance Payment Restricted');
       return;
     }
 
     if (index < minAllowedMonthIdx) {
-      alert('Payment for historical months older than the last 2 months has been removed.');
+      notify.info('Payment for historical months older than the last 2 months has been archived.', 'Historical Notice');
       return;
     }
 
@@ -192,16 +204,44 @@ export default function CompanyDashboard() {
   const handleProceedToPayUPayment = async () => {
     if (paymentState === 'creating' || paymentState === 'redirecting') return;
 
+    // Check if selected month range is already paid
+    const matchingPayment = payments.find(p => (p.month_year || p.month || '').toLowerCase().includes(rangeText.toLowerCase()));
+    if (matchingPayment && (matchingPayment.status === 'Paid' || matchingPayment.status === 'PAID')) {
+      notify.alert({
+        title: 'Invoice Already Settled',
+        message: `The invoice for ${rangeText} has already been fully paid and settled in full. Duplicate payment is not required.`,
+        type: 'success',
+        badgeText: 'PAID & VERIFIED',
+        confirmText: 'Done',
+        secondaryActionText: 'View Official Receipt',
+        onSecondaryAction: () => {
+          setSelectedReceiptData({
+            invoice_number: matchingPayment.invoice_number || `INV-MRF-2026-0000${activeCompany.id}`,
+            billing_period: matchingPayment.month_year || matchingPayment.month || rangeText,
+            customer_name: activeCompany.contact_person || activeCompany.company_name,
+            company_name: activeCompany.company_name,
+            amount: matchingPayment.amount || matchingPayment.total || totalAmount,
+            total_amount: matchingPayment.total || matchingPayment.amount || totalAmount,
+            payment_method: matchingPayment.method || matchingPayment.payment_method || 'PayU Hosted Checkout',
+            txnid: matchingPayment.txnid || `TXN_${matchingPayment.id}`,
+            payment_date: matchingPayment.payment_date || new Date().toISOString()
+          });
+          setShowReceiptModal(true);
+        }
+      });
+      return;
+    }
+
     setPaymentState('creating');
 
     const targetPayment = isPastOverdue && oldestPendingPayment ? oldestPendingPayment : null;
-    const targetInvoiceId = targetPayment?.id || 1;
+    const targetInvoiceId = targetPayment ? targetPayment.id : null;
     const targetMonth = targetPayment ? (targetPayment.month_year || targetPayment.month) : rangeText;
     const targetAmount = targetPayment ? Number(targetPayment.total || targetPayment.amount || totalAmount) : totalAmount;
     const targetTxnId = targetPayment?.txnid || `TXN${Date.now()}`;
 
     const checkoutData = {
-      id: targetInvoiceId,
+      id: targetInvoiceId || 1,
       company_id: activeCompany.id,
       company_name: activeCompany.company_name,
       month: targetMonth,
@@ -250,12 +290,39 @@ export default function CompanyDashboard() {
         form.submit();
         return;
       } else {
-        alert(data.message || 'Could not initiate PayU checkout. Please check server configuration.');
+        const errorMsg = data.message || 'Could not initiate PayU checkout. Please check server configuration.';
+        if (errorMsg.toLowerCase().includes('already been paid') || errorMsg.toLowerCase().includes('already paid')) {
+          notify.alert({
+            title: 'Invoice Already Settled',
+            message: 'This invoice has already been fully paid and verified in our database. Duplicate payment is not required.',
+            type: 'success',
+            badgeText: 'PAID & VERIFIED',
+            confirmText: 'Done',
+            secondaryActionText: 'View Official Receipt',
+            onSecondaryAction: () => {
+              const paidRecord = payments.find(p => p.status === 'Paid' || p.status === 'PAID') || {
+                invoice_number: `INV-MRF-2026-0000${activeCompany.id}`,
+                billing_period: targetMonth,
+                customer_name: activeCompany.contact_person || activeCompany.company_name,
+                company_name: activeCompany.company_name,
+                amount: targetAmount,
+                total_amount: targetAmount,
+                payment_method: 'PayU (Verified)',
+                txnid: targetTxnId,
+                payment_date: new Date().toISOString()
+              };
+              setSelectedReceiptData(paidRecord);
+              setShowReceiptModal(true);
+            }
+          });
+        } else {
+          notify.error(errorMsg, 'Payment Checkout Error');
+        }
         setPaymentState('idle');
       }
     } catch (err) {
       console.error('Error initiating PayU payment:', err);
-      alert('Network error connecting to PayU payment gateway. Please try again.');
+      notify.error('Network error connecting to PayU payment gateway. Please try again.', 'Connection Error');
       setPaymentState('idle');
     }
   };
@@ -1015,7 +1082,7 @@ export default function CompanyDashboard() {
                       <button
                         type="button"
                         className="confirm-range-btn"
-                        onClick={() => alert(`Month range confirmed: ${rangeText}`)}
+                        onClick={() => notify.success(`Month range confirmed: ${rangeText}`, 'Range Selected')}
                       >
                         Confirm
                       </button>
@@ -1037,25 +1104,6 @@ export default function CompanyDashboard() {
                     <div className="summary-row total-row">
                       <span>Total Amount:</span>
                       <span>₹{totalAmount.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  {/* Official PayU Hosted Checkout Guidance */}
-                  <div style={{
-                    backgroundColor: '#EFF6FF',
-                    border: '1px solid #BFDBFE',
-                    borderRadius: '8px',
-                    padding: '12px 16px',
-                    marginTop: '1.25rem',
-                    fontSize: '0.85rem',
-                    color: '#1E40AF',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '10px'
-                  }}>
-                    <ShieldCheck size={20} color="#2563EB" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div style={{ lineHeight: '1.5' }}>
-                      <strong>PayU Hosted Checkout:</strong> Clicking <strong>Proceed to Pay</strong> securely redirects to the official PayU Hosted Checkout gateway to complete your payment via <strong>UPI, Debit Card, Credit Card, or Net Banking</strong>.
                     </div>
                   </div>
                 </div>
@@ -1279,7 +1327,7 @@ export default function CompanyDashboard() {
                 type="button"
                 className="action-btn primary"
                 onClick={() => {
-                  alert('Receipt downloaded successfully');
+                  notify.success('Receipt downloaded successfully', 'Download Ready');
                   setShowReceiptModal(false);
                 }}
               >

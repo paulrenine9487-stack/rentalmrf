@@ -110,9 +110,38 @@ function comparePassword(plainPassword, hash) {
   return bcrypt.compareSync(plainPassword, hash);
 }
 
+const { checkPwnedPassword } = require('./hibpUtil');
+
+/**
+ * Full security validation including complexity and Have I Been Pwned breach check
+ * @param {string} password 
+ * @returns {Promise<{ valid: boolean, message: string, breachCount?: number }>}
+ */
+async function validatePasswordStrict(password) {
+  const reqCheck = validatePasswordRequirements(password);
+  if (!reqCheck.valid) {
+    return reqCheck;
+  }
+
+  // Check HIBP
+  const hibp = await checkPwnedPassword(password);
+  if (hibp.isPwned) {
+    return {
+      valid: false,
+      message: `Security alert: This password was compromised in ${hibp.breachCount.toLocaleString()} known public data breaches (Have I Been Pwned). Please choose a stronger, unique password.`,
+      breachCount: hibp.breachCount
+    };
+  }
+
+  return { valid: true, message: 'Password is strong and has no recorded data breaches.' };
+}
+
 module.exports = {
   generateTemporaryPassword,
   validatePasswordRequirements,
+  validatePasswordStrict,
+  checkPwnedPassword,
   hashPassword,
   comparePassword
 };
+

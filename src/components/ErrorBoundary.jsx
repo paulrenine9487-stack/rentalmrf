@@ -1,4 +1,5 @@
 import React from 'react';
+import { captureException } from '../services/sentry';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,6 +13,10 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    captureException(error, {
+      componentStack: errorInfo?.componentStack,
+      boundary: 'RootErrorBoundary'
+    });
   }
 
   handleReload = () => {

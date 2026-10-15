@@ -1,0 +1,45 @@
+name: Production Security & Vulnerability Scan
+
+on:
+  push:
+    branches: [ main, master, rental ]
+  pull_request:
+    branches: [ main, master, rental ]
+  schedule:
+    # Run daily at 02:00 UTC for automated CVE scanning
+    - cron: '0 2 * * *'
+
+jobs:
+  security-audit:
+    name: Snyk & Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Client & Server Dependencies
+        run: |
+          npm ci
+          cd server && npm ci && cd ..
+
+      - name: Run Root NPM Security Audit
+        run: npm audit --audit-level=high
+
+      - name: Run Backend Server NPM Security Audit
+        run: cd server && npm audit --audit-level=high && cd ..
+
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Verify Production Build
+        run: npm run build

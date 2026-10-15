@@ -7,19 +7,36 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
+const compression = require('compression');
 const db = require('./db');
 const { encryptSmtpPassword, decryptSmtpPassword } = require('./utils/cryptoUtil');
 const emailService = require('./services/emailService');
 const payuService = require('./services/payuService');
-const { generateTemporaryPassword, validatePasswordRequirements, hashPassword, comparePassword } = require('./utils/passwordUtil');
+const { generateTemporaryPassword, validatePasswordRequirements, validatePasswordStrict, hashPassword, comparePassword } = require('./utils/passwordUtil');
+const securityHeaders = require('./middleware/securityHeaders');
+const { globalLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { validateEnvironment } = require('./utils/envValidator');
+const sentry = require('./utils/sentry');
+
+// Validate environment and Doppler secrets on startup
+validateEnvironment();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'mccmrfip_jwt_super_secret_key_2026';
 
+// Enterprise Production Middleware
+app.use(securityHeaders);
+app.use(compression()); // Gzip/Brotli compression for PageSpeed & GTmetrix
+app.use(globalLimiter); // DDoS & rate-limiting protection
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Security & Analytics API Routes
+app.use('/api/security', require('./routes/securityRoutes'));
+app.use('/api/analytics', require('./routes/analyticsRoutes'));
 
 // ==========================================================================
 // SECURITY & JWT AUTHENTICATION MIDDLEWARE
@@ -37,6 +54,13 @@ const authenticateJWT = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Authorization Bearer token is missing.'
+      });
+    }
+    // Allow development fallback only if explicit flag is set or non-production
     req.user = { id: 2, name: 'Admin', role: 'ADMIN', role_id: 2, permissions: DEFAULT_ADMIN_PERMISSIONS };
     return next();
   }
@@ -53,10 +77,17 @@ const authenticateJWT = async (req, res, next) => {
 
     next();
   } catch (err) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired session token. Please log in again.'
+      });
+    }
     req.user = { id: 2, name: 'Admin', role: 'ADMIN', role_id: 2, permissions: DEFAULT_ADMIN_PERMISSIONS };
     return next();
   }
 };
+
 
 // Require Specific Role Middleware
 const requireRole = (...allowedRoles) => {
@@ -97,9 +128,45 @@ const requirePermission = (permissionKey) => {
   };
 };
 
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MCC MRF Innovation Park Backend Server Running' });
+// Health Check (Deep diagnostics for Pingdom, UptimeRobot, Datadog)
+app.get('/api/health', async (req, res) => {
+  let dbLatency = null;
+  let dbStatus = 'connected';
+  try {
+    const start = Date.now();
+    await db.query('SELECT 1');
+    dbLatency = Date.now() - start;
+  } catch (err) {
+    dbStatus = 'disconnected';
+  }
+
+  const mem = process.memoryUsage();
+  res.json({
+    status: dbStatus === 'connected' ? 'ok' : 'degraded',
+    message: 'MCC MRF Innovation Park Backend Server Running',
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+    system: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      memory: {
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024)
+      }
+    },
+    database: {
+      status: dbStatus,
+      latencyMs: dbLatency
+    },
+    security: {
+      sslLabsTarget: 'A+',
+      securityHeaders: 'Active',
+      rateLimiting: 'Active',
+      hibpProtection: 'Active',
+      environment: process.env.NODE_ENV || 'production'
+    }
+  });
 });
 
 // ==========================================================================
@@ -110,8 +177,8 @@ app.get('/api/health', (req, res) => {
 // In-Memory Password Reset OTP Store
 const passwordResetOtpStore = new Map();
 
-// Admin, Super Admin & Company Authentication
-app.post('/api/auth/login', async (req, res) => {
+// Admin, Super Admin & Company Authentication (Protected with strict brute-force rate limiter)
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
     const { username, email, password } = req.body;
     const loginIdentifier = (username || email || '').trim();
@@ -234,8 +301,8 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Send Verification Code (OTP) to registered Email / Gmail
-app.post(['/api/auth/forgot-password/send-otp', '/api/user/forgot-password/send-otp', '/api/auth/forgot-password'], async (req, res) => {
+// Send Verification Code (OTP) to registered Email / Gmail (Protected with rate limiter)
+app.post(['/api/auth/forgot-password/send-otp', '/api/user/forgot-password/send-otp', '/api/auth/forgot-password'], authLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email || !email.trim()) {
@@ -299,8 +366,8 @@ app.post(['/api/auth/forgot-password/send-otp', '/api/user/forgot-password/send-
   }
 });
 
-// Verify OTP & Reset Password
-app.post(['/api/auth/forgot-password/verify-otp', '/api/user/forgot-password/verify-otp', '/api/auth/reset-password-otp'], async (req, res) => {
+// Verify OTP & Reset Password (Protected with rate limiter and strict HIBP security check)
+app.post(['/api/auth/forgot-password/verify-otp', '/api/user/forgot-password/verify-otp', '/api/auth/reset-password-otp'], authLimiter, async (req, res) => {
   try {
     const { email, otp, newPassword, confirmPassword } = req.body;
 
@@ -354,8 +421,10 @@ app.post(['/api/auth/forgot-password/verify-otp', '/api/user/forgot-password/ver
       return res.status(400).json({ success: false, message: 'New password is required.' });
     }
 
-    if (newPassword.length < 4) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long.' });
+    // Validate password requirements & Have I Been Pwned breach check
+    const passCheck = await validatePasswordStrict(newPassword);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, message: passCheck.message });
     }
 
     if (confirmPassword !== undefined && newPassword !== confirmPassword) {
@@ -424,8 +493,8 @@ app.get('/api/auth/me', authenticateJWT, async (req, res) => {
   });
 });
 
-// Change Password for User / Admin / Company
-app.post('/api/auth/change-password', async (req, res) => {
+// Change Password for User / Admin / Company (Rate-limited & HIBP verified)
+app.post('/api/auth/change-password', authLimiter, async (req, res) => {
   try {
     const { companyId, email, currentPassword, newPassword, confirmPassword } = req.body;
 
@@ -435,6 +504,12 @@ app.post('/api/auth/change-password', async (req, res) => {
 
     if (confirmPassword !== undefined && newPassword !== confirmPassword) {
       return res.status(400).json({ success: false, message: 'New Password and Confirm Password do not match.' });
+    }
+
+    // Strict validation with complexity rules and HIBP breach check
+    const passCheck = await validatePasswordStrict(newPassword);
+    if (!passCheck.valid) {
+      return res.status(400).json({ success: false, message: passCheck.message });
     }
 
     // Resolve user (supports company, admin, super admin)
@@ -457,7 +532,7 @@ app.post('/api/auth/change-password', async (req, res) => {
       const isAdminAccount = (user && (user.role === 'ADMIN' || user.role_id === 2));
 
       let currentMatch = comparePassword(currentPassword, user.password_hash);
-      if (!currentMatch) {
+      if (!currentMatch && process.env.NODE_ENV !== 'production') {
         if (isSuperAdminAccount && currentPassword === 'super2024') {
           currentMatch = true;
         } else if (isAdminAccount && currentPassword === 'Novara2024') {
@@ -2384,21 +2459,39 @@ app.post('/api/smtp-settings/:id/test-connection/', authenticateJWT, requireSupe
   }
 });
 
-// Serve static frontend build if present (for single-port live deployment)
+// Serve static frontend build if present (with PageSpeed / GTmetrix immutable caching)
 const distPath = path.join(__dirname, '../dist');
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    maxAge: '1y',
+    immutable: true,
+    setHeaders: (res, filePath) => {
+      // Never cache index.html so single-page app updates are instant
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    }
+  }));
+
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
     const indexPath = path.join(distPath, 'index.html');
     if (fs.existsSync(indexPath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       return res.sendFile(indexPath);
     }
     next();
   });
 }
+
+// Sentry & Centralized Observability Error Handler
+app.use(sentry.sentryErrorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`MCC MRF Enterprise Backend Server running on http://localhost:${PORT}`);

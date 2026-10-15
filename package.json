@@ -9,14 +9,20 @@
     "dev": "concurrently -p \"[{name}]\" -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run server\" \"npm run client\"",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "security:check": "node scripts/securityCheck.js",
+    "security:audit": "npm audit && cd server && npm audit",
+    "snyk:test": "npx -y snyk test",
+    "doppler:run": "doppler run -- npm run dev",
+    "lighthouse": "npx -y @lhci/cli autorun"
   },
   "dependencies": {
     "lucide-react": "^1.31.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "web-vitals": "^6.2.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",

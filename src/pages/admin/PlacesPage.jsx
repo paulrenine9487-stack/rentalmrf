@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, Search, Edit2, Trash2, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { notify } from '../../components/common/EnterpriseNotificationSystem';
 import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function PlacesPage() {
@@ -132,13 +133,14 @@ export default function PlacesPage() {
 
       if (data.success) {
         setShowDeleteModal(false);
+        notify.success('Place record deleted successfully', 'Deleted');
         fetchPlaces();
       } else {
-        alert(data.message || 'Failed to delete place.');
+        notify.error(data.message || 'Failed to delete place.', 'Deletion Error');
       }
     } catch (err) {
       setSubmitting(false);
-      alert('Error deleting place record.');
+      notify.error('Error deleting place record.', 'Network Error');
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Menu as MenuIcon, Plus, Edit2, Trash2, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { notify } from '../../components/common/EnterpriseNotificationSystem';
 import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function MenuManagementPage() {
@@ -117,13 +118,14 @@ export default function MenuManagementPage() {
 
       if (data.success) {
         setShowDeleteModal(false);
+        notify.success('Menu item deleted successfully', 'Deleted');
         fetchMenus();
       } else {
-        alert(data.message || 'Failed to delete menu.');
+        notify.error(data.message || 'Failed to delete menu.', 'Deletion Error');
       }
     } catch (err) {
       setSubmitting(false);
-      alert('Error deleting menu.');
+      notify.error('Error deleting menu.', 'Network Error');
     }
   };
 

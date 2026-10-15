@@ -1,0 +1,12 @@
+# Snyk (https://snyk.io) policy file
+version: v1.25.0
+ignore: {}
+patch: {}
+language-settings:
+  javascript:
+    strict-out-of-sync: true
+exclude:
+  global:
+    - dist/**
+    - tests/**
+    - coverage/**

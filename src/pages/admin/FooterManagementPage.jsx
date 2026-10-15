@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutTemplate, Plus, Edit2, Trash2, X, AlertTriangle, CheckCircle2, Save, Share2 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { notify } from '../../components/common/EnterpriseNotificationSystem';
 import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function FooterManagementPage() {
@@ -125,12 +126,14 @@ export default function FooterManagementPage() {
 
       if (data.success) {
         setShowSocialModal(false);
+        notify.success('Social media link saved successfully', 'Saved');
         fetchFooterData();
       } else {
-        alert(data.message || 'Failed to save social media link');
+        notify.error(data.message || 'Failed to save social media link', 'Save Error');
       }
     } catch (err) {
       setSubmitting(false);
+      notify.error('Network error saving social link', 'Network Error');
     }
   };
 

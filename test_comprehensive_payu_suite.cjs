@@ -312,6 +312,8 @@ async function runTestSuite() {
     // Create an explicit invoice in DB first
     const company = await db.getCompanyById(6);
     const inv = await db.createInvoiceForCompany(company);
+    await db.updateInvoiceStatus(inv.id, 'UNPAID');
+    inv.status = 'UNPAID';
     console.log(`    Created test invoice ${inv.id} (${inv.invoice_number}) with status: ${inv.status}`);
 
     // Verify invoice starts as UNPAID

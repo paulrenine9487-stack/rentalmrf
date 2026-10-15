@@ -1,0 +1,75 @@
+{
+  "project": "MCC MRF Innovation Park Portal",
+  "build": "Production Release 1.0.0",
+  "browserstack": {
+    "browsers": [
+      {
+        "os": "Windows",
+        "os_version": "11",
+        "browser": "Chrome",
+        "browser_version": "latest"
+      },
+      {
+        "os": "Windows",
+        "os_version": "11",
+        "browser": "Edge",
+        "browser_version": "latest"
+      },
+      {
+        "os": "Windows",
+        "os_version": "11",
+        "browser": "Firefox",
+        "browser_version": "latest"
+      },
+      {
+        "os": "OS X",
+        "os_version": "Sonoma",
+        "browser": "Safari",
+        "browser_version": "latest"
+      },
+      {
+        "device": "iPhone 15 Pro",
+        "os_version": "17",
+        "real_mobile": "true",
+        "browser": "Safari"
+      },
+      {
+        "device": "Samsung Galaxy S24",
+        "os_version": "14.0",
+        "real_mobile": "true",
+        "browser": "Chrome"
+      }
+    ]
+  },
+  "lambdatest": {
+    "platforms": [
+      {
+        "platform": "Windows 11",
+        "browserName": "Chrome",
+        "version": "latest"
+      },
+      {
+        "platform": "MacOS Sonoma",
+        "browserName": "Safari",
+        "version": "latest"
+      },
+      {
+        "platform": "ios",
+        "deviceName": "iPhone 15",
+        "platformVersion": "17"
+      },
+      {
+        "platform": "android",
+        "deviceName": "Galaxy S23",
+        "platformVersion": "13"
+      }
+    ]
+  },
+  "viewports": [
+    { "name": "Mobile Portrait", "width": 375, "height": 667 },
+    { "name": "Mobile Landscape", "width": 667, "height": 375 },
+    { "name": "Tablet Portrait", "width": 768, "height": 1024 },
+    { "name": "Laptop Desktop", "width": 1366, "height": 768 },
+    { "name": "Full HD Desktop", "width": 1920, "height": 1080 }
+  ]
+}

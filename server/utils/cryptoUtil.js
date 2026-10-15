@@ -61,6 +61,18 @@ function decryptSmtpPassword(encryptedData) {
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
+    try {
+      const LEGACY_KEY = crypto.scryptSync('mccmrfip_smtp_aes256_encryption_key_2026', 'mccmrfip_smtp_salt_2026', 32);
+      const iv = Buffer.from(parsed.iv, 'hex');
+      const authTag = Buffer.from(parsed.tag, 'hex');
+      const decipher = crypto.createCipheriv ? crypto.createDecipheriv(ALGORITHM, LEGACY_KEY, iv) : null;
+      if (decipher) {
+        decipher.setAuthTag(authTag);
+        let decrypted = decipher.update(parsed.content, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+      }
+    } catch (fallbackErr) {}
     console.error('[CRYPTO ERROR] Failed to decrypt SMTP password:', err.message);
     return '';
   }

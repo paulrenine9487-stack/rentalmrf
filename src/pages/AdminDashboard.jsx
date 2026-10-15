@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Shield, Server, UserCheck, Activity } from 'lucide-react';
+import { notify } from '../components/common/EnterpriseNotificationSystem';
 import { API_BASE_URL } from '../utils/apiConfig';
 import './AdminDashboard.css';
 
@@ -96,15 +97,15 @@ export default function AdminDashboard() {
       const data = await res.json();
 
       if (data.success) {
-        alert(editingPlace ? 'Place updated successfully!' : 'Place added successfully!');
+        notify.success(editingPlace ? 'Place updated successfully!' : 'Place added successfully!', 'Saved');
         setShowPlaceModal(false);
         fetchPlaces();
       } else {
-        alert(data.message || 'Error saving place details.');
+        notify.error(data.message || 'Error saving place details.', 'Save Error');
       }
     } catch (err) {
       console.error('Error saving place:', err);
-      alert('Place saved successfully!');
+      notify.success('Place saved successfully!', 'Saved');
       setShowPlaceModal(false);
       fetchPlaces();
     }
@@ -120,13 +121,13 @@ export default function AdminDashboard() {
         });
         const data = await res.json();
         if (data.success) {
-          alert(`Workspace "${place.name}" removed successfully.`);
+          notify.success(`Workspace "${place.name}" removed successfully.`, 'Deleted');
           fetchPlaces();
         } else {
-          alert(data.message || 'Error deleting place.');
+          notify.error(data.message || 'Error deleting place.', 'Deletion Error');
         }
       } catch (err) {
-        alert(`Workspace "${place.name}" removed.`);
+        notify.success(`Workspace "${place.name}" removed.`, 'Deleted');
         fetchPlaces();
       }
     }
@@ -321,13 +322,13 @@ export default function AdminDashboard() {
         });
         const data = await res.json();
         if (data.success) {
-          alert(`${comp.company_name} has been removed from the database.`);
+          notify.success(`${comp.company_name} has been removed from the database.`, 'Company Removed');
           fetchCompanies();
         } else {
-          alert(data.message || 'Error deleting company.');
+          notify.error(data.message || 'Error deleting company.', 'Deletion Error');
         }
       } catch (err) {
-        alert(`${comp.company_name} removed from database.`);
+        notify.success(`${comp.company_name} removed from database.`, 'Removed');
         fetchCompanies();
       }
     }
@@ -373,15 +374,15 @@ export default function AdminDashboard() {
       const data = await res.json();
 
       if (data.success) {
-        alert(editingCompany ? 'Company updated successfully!' : 'Company added successfully!');
+        notify.success(editingCompany ? 'Company updated successfully!' : 'Company added successfully!', 'Success');
         setShowModal(false);
         fetchCompanies();
       } else {
-        alert(data.message || 'Error saving company details.');
+        notify.error(data.message || 'Error saving company details.', 'Save Error');
       }
     } catch (err) {
       console.error('Error saving company:', err);
-      alert('Action completed successfully!');
+      notify.success('Action completed successfully!', 'Success');
       setShowModal(false);
       fetchCompanies();
     }

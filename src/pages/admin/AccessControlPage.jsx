@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Users, Plus, Edit2, Trash2, Key, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import { notify } from '../../components/common/EnterpriseNotificationSystem';
 import { API_BASE_URL } from '../../utils/apiConfig';
 
 export default function AccessControlPage() {
@@ -130,13 +131,14 @@ export default function AccessControlPage() {
 
       if (data.success) {
         setShowDeleteModal(false);
+        notify.success('User deleted successfully', 'Deleted');
         fetchAccessData();
       } else {
-        alert(data.message || 'Failed to delete user.');
+        notify.error(data.message || 'Failed to delete user.', 'Deletion Error');
       }
     } catch (err) {
       setSubmitting(false);
-      alert('Error deleting user.');
+      notify.error('Error deleting user record.', 'Network Error');
     }
   };
 

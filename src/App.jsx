@@ -20,12 +20,14 @@ import AccessControlPage from './pages/admin/AccessControlPage';
 import MenuManagementPage from './pages/admin/MenuManagementPage';
 import FooterManagementPage from './pages/admin/FooterManagementPage';
 import SettingsPage from './pages/admin/SettingsPage';
+import EnterpriseNotificationSystem from './components/common/EnterpriseNotificationSystem';
 
 import './styles/global.css';
 
 export default function App() {
   return (
     <Router>
+      <EnterpriseNotificationSystem />
       <Routes>
         {/* Public Website Routes */}
         <Route path="/" element={<Home />} />

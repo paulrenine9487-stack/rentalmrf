@@ -1,0 +1,490 @@
+/* ==========================================================================
+   MCC MRF INNOVATION PARK — ENTERPRISE NOTIFICATION & MODAL SYSTEM
+   ========================================================================== */
+
+/* TOAST CONTAINER (Top Right Floating Stack) */
+.mrf-toast-container {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 420px;
+  width: calc(100vw - 3rem);
+  pointer-events: none;
+}
+
+/* INDIVIDUAL TOAST CARD */
+.mrf-toast-card {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  animation: mrfSlideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mrf-toast-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -4px rgba(15, 23, 42, 0.2);
+}
+
+.mrf-toast-card.removing {
+  animation: mrfSlideOutRight 0.25s ease forwards;
+}
+
+/* Toast Type Border Accents */
+.mrf-toast-card.success {
+  border-left: 4px solid #10B981;
+}
+
+.mrf-toast-card.error {
+  border-left: 4px solid #EF4444;
+}
+
+.mrf-toast-card.warning {
+  border-left: 4px solid #F59E0B;
+}
+
+.mrf-toast-card.info {
+  border-left: 4px solid #8B0000;
+}
+
+/* Toast Icon Wrapper */
+.mrf-toast-icon-wrapper {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.mrf-toast-card.success .mrf-toast-icon-wrapper {
+  background: #ECFDF5;
+  color: #059669;
+}
+
+.mrf-toast-card.error .mrf-toast-icon-wrapper {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.mrf-toast-card.warning .mrf-toast-icon-wrapper {
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+.mrf-toast-card.info .mrf-toast-icon-wrapper {
+  background: #FDF2F2;
+  color: #8B0000;
+}
+
+/* Toast Content */
+.mrf-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.mrf-toast-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 0.2rem;
+  line-height: 1.3;
+}
+
+.mrf-toast-message {
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+/* Toast Close Button */
+.mrf-toast-close-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.mrf-toast-close-btn:hover {
+  background: #F1F5F9;
+  color: #334155;
+}
+
+/* Toast Progress Bar */
+.mrf-toast-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  width: 100%;
+}
+
+.mrf-toast-progress-fill {
+  height: 100%;
+  transition: width linear;
+}
+
+.mrf-toast-card.success .mrf-toast-progress-fill {
+  background: #10B981;
+}
+
+.mrf-toast-card.error .mrf-toast-progress-fill {
+  background: #EF4444;
+}
+
+.mrf-toast-card.warning .mrf-toast-progress-fill {
+  background: #F59E0B;
+}
+
+.mrf-toast-card.info .mrf-toast-progress-fill {
+  background: #8B0000;
+}
+
+/* ==========================================================================
+   ENTERPRISE MODAL / DIALOG (Replaces window.alert & window.confirm)
+   ========================================================================== */
+
+.mrf-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999999;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: mrfFadeIn 0.25s ease forwards;
+}
+
+.mrf-dialog-container {
+  background: #FFFFFF;
+  border-radius: 18px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  animation: mrfScaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal Header Bar */
+.mrf-dialog-header {
+  background: linear-gradient(135deg, #8B0000 0%, #600000 100%);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #D4AF37;
+  color: #FFFFFF;
+}
+
+.mrf-dialog-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mrf-dialog-brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  background: #FFFFFF;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.mrf-dialog-brand-text h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.mrf-dialog-brand-text span {
+  font-size: 0.75rem;
+  color: #F8D7DA;
+  font-weight: 500;
+}
+
+.mrf-dialog-close-icon {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #FFFFFF;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mrf-dialog-close-icon:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Modal Body */
+.mrf-dialog-body {
+  padding: 1.75rem 1.75rem 1.25rem;
+  text-align: center;
+}
+
+.mrf-dialog-status-icon-box {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.mrf-dialog-status-icon-box.success {
+  background: #ECFDF5;
+  color: #059669;
+  box-shadow: 0 0 0 8px #D1FAE5;
+}
+
+.mrf-dialog-status-icon-box.error {
+  background: #FEF2F2;
+  color: #DC2626;
+  box-shadow: 0 0 0 8px #FEE2E2;
+}
+
+.mrf-dialog-status-icon-box.warning {
+  background: #FFFBEB;
+  color: #D97706;
+  box-shadow: 0 0 0 8px #FEF3C7;
+}
+
+.mrf-dialog-status-icon-box.info {
+  background: #FDF2F2;
+  color: #8B0000;
+  box-shadow: 0 0 0 8px #FCE7E7;
+}
+
+.mrf-dialog-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin-bottom: 0.65rem;
+  letter-spacing: -0.015em;
+}
+
+.mrf-dialog-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.mrf-dialog-badge.success {
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+}
+
+.mrf-dialog-badge.info {
+  background: #FDF2F2;
+  color: #8B0000;
+  border: 1px solid #FECACA;
+}
+
+.mrf-dialog-badge.warning {
+  background: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+
+.mrf-dialog-message {
+  font-size: 0.92rem;
+  color: #475569;
+  line-height: 1.55;
+  margin-bottom: 1.5rem;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Card details sub-box */
+.mrf-dialog-details-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+/* Modal Actions Footer */
+.mrf-dialog-footer {
+  padding: 1rem 1.5rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.mrf-dialog-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  border: none;
+  min-height: 44px;
+}
+
+.mrf-dialog-btn.primary {
+  background: #8B0000;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(139, 0, 0, 0.25);
+  flex: 1;
+}
+
+.mrf-dialog-btn.primary:hover {
+  background: #700000;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(139, 0, 0, 0.35);
+}
+
+.mrf-dialog-btn.primary.success-btn {
+  background: #059669;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+
+.mrf-dialog-btn.primary.success-btn:hover {
+  background: #047857;
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
+}
+
+.mrf-dialog-btn.secondary {
+  background: #F1F5F9;
+  color: #334155;
+  border: 1px solid #CBD5E1;
+  flex: 1;
+}
+
+.mrf-dialog-btn.secondary:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.mrf-dialog-btn.danger {
+  background: #DC2626;
+  color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+  flex: 1;
+}
+
+.mrf-dialog-btn.danger:hover {
+  background: #B91C1C;
+}
+
+/* ==========================================================================
+   KEYFRAME ANIMATIONS
+   ========================================================================== */
+@keyframes mrfSlideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes mrfSlideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+}
+
+@keyframes mrfFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes mrfScaleUp {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes mrfProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@media (max-width: 640px) {
+  .mrf-toast-container {
+    top: 1rem;
+    right: 1rem;
+    left: 1rem;
+    max-width: 100%;
+    width: auto;
+  }
+
+  .mrf-dialog-footer {
+    flex-direction: column;
+  }
+
+  .mrf-dialog-btn {
+    width: 100%;
+  }
+}

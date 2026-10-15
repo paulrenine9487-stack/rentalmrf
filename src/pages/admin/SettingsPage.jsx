@@ -16,9 +16,11 @@ import {
   X,
   Check,
   CreditCard,
-  Key
+  Key,
+  Activity
 } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
+import SecurityProductionPanel from '../../components/admin/SecurityProductionPanel';
 import { API_BASE_URL } from '../../utils/apiConfig';
 
 const PRESET_PROVIDERS = [
@@ -563,6 +565,13 @@ export default function SettingsPage() {
           <ShieldCheck size={18} />
           <span>Account Security & Profile</span>
         </button>
+        <button
+          className={`smtp-tab-btn ${activeSubTab === 'security-production' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('security-production')}
+        >
+          <Activity size={18} />
+          <span>Production & Security Suite</span>
+        </button>
       </div>
 
       {/* TAB 1: SMTP MANAGEMENT */}
@@ -1077,6 +1086,11 @@ export default function SettingsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* TAB 4: ENTERPRISE PRODUCTION & SECURITY SUITE */}
+      {activeSubTab === 'security-production' && (
+        <SecurityProductionPanel />
       )}
 
       {/* ================================================== */}

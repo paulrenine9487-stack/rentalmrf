@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, KeyRound, ShieldCheck, ArrowRight, UserCheck, Sparkles } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle2, AlertTriangle, KeyRound, ShieldCheck, ArrowRight, UserCheck, Sparkles, ShieldAlert } from 'lucide-react';
 import { evaluatePasswordStrength } from '../utils/passwordGenerator';
+import { checkPasswordBreach } from '../utils/hibpClient';
 import { API_BASE_URL } from '../utils/apiConfig';
 import './ChangePassword.css';
 
@@ -18,8 +19,30 @@ export default function ChangePasswordPage() {
   const [submitting, setSubmitting] = useState(false);
   const [userEmail, setUserEmail] = useState('');
 
+  // Have I Been Pwned breach status state
+  const [hibpStatus, setHibpStatus] = useState({ checking: false, isPwned: false, breachCount: 0 });
+
   const navigate = useNavigate();
   const strength = evaluatePasswordStrength(newPassword);
+
+  useEffect(() => {
+    if (!newPassword || newPassword.length < 6) {
+      setHibpStatus({ checking: false, isPwned: false, breachCount: 0 });
+      return;
+    }
+
+    setHibpStatus(prev => ({ ...prev, checking: true }));
+    const timer = setTimeout(async () => {
+      const res = await checkPasswordBreach(newPassword);
+      setHibpStatus({
+        checking: false,
+        isPwned: Boolean(res.isPwned),
+        breachCount: res.breachCount || 0
+      });
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [newPassword]);
 
   useEffect(() => {
     const userStr = localStorage.getItem('currentUser') || localStorage.getItem('currentCompany');
@@ -50,6 +73,14 @@ export default function ChangePasswordPage() {
 
     if (!strength.isValid) {
       setAlertMsg({ type: 'error', text: 'New password does not meet security requirements.' });
+      return;
+    }
+
+    if (hibpStatus.isPwned) {
+      setAlertMsg({
+        type: 'error',
+        text: `Security Warning: This password was found in ${hibpStatus.breachCount.toLocaleString()} public data breaches (Have I Been Pwned). Please choose a unique password.`
+      });
       return;
     }
 
@@ -288,6 +319,20 @@ export default function ChangePasswordPage() {
                   <CheckCircle2 size={14} color={strength.requirements.hasSpecial ? '#16A34A' : '#CBD5E1'} />
                   <span>At least one special character (!@#$%^&*)</span>
                 </div>
+                <div className={`change-pass-check-item ${!hibpStatus.checking && newPassword.length >= 8 && !hibpStatus.isPwned ? 'met' : hibpStatus.isPwned ? 'unmet' : 'unmet'}`}>
+                  {hibpStatus.isPwned ? (
+                    <ShieldAlert size={14} color="#DC2626" />
+                  ) : (
+                    <ShieldCheck size={14} color={(!hibpStatus.checking && newPassword.length >= 8 && !hibpStatus.isPwned) ? '#16A34A' : '#CBD5E1'} />
+                  )}
+                  <span style={{ color: hibpStatus.isPwned ? '#DC2626' : 'inherit', fontWeight: hibpStatus.isPwned ? 600 : 'normal' }}>
+                    {hibpStatus.checking
+                      ? 'Verifying password with Have I Been Pwned...'
+                      : hibpStatus.isPwned
+                      ? `Leaked in ${hibpStatus.breachCount.toLocaleString()} breaches (Compromised!)`
+                      : 'No known public data breaches (Have I Been Pwned)'}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -295,7 +340,7 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               className="change-pass-submit-btn"
-              disabled={submitting || !strength.isValid}
+              disabled={submitting || !strength.isValid || hibpStatus.isPwned || hibpStatus.checking}
             >
               <span>{submitting ? 'Updating Password...' : 'Save New Password & Continue'}</span>
               {!submitting && <ArrowRight size={18} />}

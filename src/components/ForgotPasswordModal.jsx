@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Lock, KeyRound, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle, X, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, KeyRound, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle, X, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { API_BASE_URL } from '../utils/apiConfig';
+import { checkPasswordBreach } from '../utils/hibpClient';
 import './ForgotPasswordModal.css';
 
 export default function ForgotPasswordModal({
@@ -21,6 +22,28 @@ export default function ForgotPasswordModal({
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState({ type: '', text: '' });
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Have I Been Pwned breach validation state
+  const [hibpStatus, setHibpStatus] = useState({ checking: false, isPwned: false, breachCount: 0 });
+
+  useEffect(() => {
+    if (!newPassword || newPassword.length < 6) {
+      setHibpStatus({ checking: false, isPwned: false, breachCount: 0 });
+      return;
+    }
+
+    setHibpStatus(prev => ({ ...prev, checking: true }));
+    const timer = setTimeout(async () => {
+      const res = await checkPasswordBreach(newPassword);
+      setHibpStatus({
+        checking: false,
+        isPwned: Boolean(res.isPwned),
+        breachCount: res.breachCount || 0
+      });
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [newPassword]);
 
   useEffect(() => {
     if (isOpen) {
@@ -110,8 +133,16 @@ export default function ForgotPasswordModal({
       return;
     }
 
-    if (newPassword.length < 4) {
-      setAlert({ type: 'error', text: 'New password must be at least 4 characters long.' });
+    if (newPassword.length < 8) {
+      setAlert({ type: 'error', text: 'New password must be at least 8 characters long.' });
+      return;
+    }
+
+    if (hibpStatus.isPwned) {
+      setAlert({
+        type: 'error',
+        text: `Security Warning: This password was compromised in ${hibpStatus.breachCount.toLocaleString()} public data breaches (Have I Been Pwned). Please choose a different password.`
+      });
       return;
     }
 
@@ -370,6 +401,35 @@ export default function ForgotPasswordModal({
                     {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {/* Have I Been Pwned Security Status Badge */}
+                {newPassword && (
+                  <div style={{
+                    marginTop: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.78rem',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: hibpStatus.isPwned ? '#FEE2E2' : (!hibpStatus.checking && newPassword.length >= 8) ? '#DCFCE7' : '#F1F5F9',
+                    color: hibpStatus.isPwned ? '#B91C1C' : (!hibpStatus.checking && newPassword.length >= 8) ? '#15803D' : '#475569'
+                  }}>
+                    {hibpStatus.isPwned ? (
+                      <ShieldAlert size={14} color="#B91C1C" />
+                    ) : (
+                      <ShieldCheck size={14} color={(!hibpStatus.checking && newPassword.length >= 8) ? '#15803D' : '#64748B'} />
+                    )}
+                    <span>
+                      {hibpStatus.checking
+                        ? 'Verifying with Have I Been Pwned breach database...'
+                        : hibpStatus.isPwned
+                        ? `Compromised in ${hibpStatus.breachCount.toLocaleString()} data breaches! Choose a unique password.`
+                        : newPassword.length >= 8
+                        ? 'Verified Safe: 0 public breaches in Have I Been Pwned database.'
+                        : 'Minimum 8 characters with letters, numbers, and symbols required.'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Confirm Password */}
@@ -411,7 +471,7 @@ export default function ForgotPasswordModal({
                 <button
                   type="submit"
                   className="forgot-btn-primary"
-                  disabled={loading || otp.length < 6 || !newPassword}
+                  disabled={loading || otp.length < 6 || !newPassword || newPassword.length < 8 || hibpStatus.isPwned || hibpStatus.checking}
                 >
                   {loading ? (
                     <>
