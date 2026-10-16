@@ -66,11 +66,17 @@ function validateEnvironment() {
   }
 
   // Check PayU Keys
-  if (process.env.PAYU_MERCHANT_KEY === '7kml0E' && isProduction) {
+  if (process.env.PAYU_MERCHANT_KEY === 'gtKFFx' && isProduction) {
     warnings.push({
       key: 'PAYU_MERCHANT_KEY',
       severity: 'CRITICAL',
-      message: 'PayU is currently configured with the test merchant key (7kml0E) in production mode.'
+      message: 'PayU is currently configured with the test sandbox merchant key (gtKFFx) in production mode.'
+    });
+  } else if (process.env.PAYU_MERCHANT_KEY === '7kml0E' && !isProduction) {
+    warnings.push({
+      key: 'PAYU_MERCHANT_KEY',
+      severity: 'MEDIUM',
+      message: 'Merchant key 7kml0E is configured in test mode. If this is a live key, switch PAYU_ENVIRONMENT to production.'
     });
   }
 

@@ -10,8 +10,10 @@ const globalLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skip: (req) => {
-    // Never rate limit Pingdom / uptime monitoring health check probes
-    return req.path === '/api/health' || req.path === '/health';
+    // Never rate limit localhost development or health check probes
+    const ip = req.ip || req.connection?.remoteAddress || '';
+    const isLocal = ip === '127.0.0.1' || ip === '::1' || ip.includes('127.0.0.1') || process.env.NODE_ENV !== 'production';
+    return isLocal || req.path === '/api/health' || req.path === '/health';
   },
   message: {
     success: false,

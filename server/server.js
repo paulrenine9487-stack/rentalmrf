@@ -1446,9 +1446,15 @@ app.post(['/api/payments/create-payu-payment', '/api/payment/create-payu-payment
     // Server-Side Invoice Resolution & Rent/GST Calculation (Never trust frontend amount)
     let targetInvoice = null;
     if (invoice_id) {
-      targetInvoice = await db.getInvoiceById(invoice_id);
-      if (targetInvoice && targetInvoice.status === 'PAID') {
-        return res.status(400).json({ success: false, message: 'This invoice has already been paid.' });
+      const inv = await db.getInvoiceById(invoice_id);
+      if (inv) {
+        const reqMonth = billing_month || req.body.month;
+        if (inv.status === 'PAID' && (!reqMonth || String(reqMonth).toLowerCase().trim() === String(inv.billing_period).toLowerCase().trim())) {
+          return res.status(400).json({ success: false, message: 'This invoice has already been paid.' });
+        }
+        if (inv.status !== 'PAID') {
+          targetInvoice = inv;
+        }
       }
     }
 
@@ -1471,8 +1477,9 @@ app.post(['/api/payments/create-payu-payment', '/api/payment/create-payu-payment
     const transactionId = `MRF${datePrefix}${randomHex}`; // Example: MRF2610137X8Y (14 chars)
     const billingPeriod = targetInvoice ? (targetInvoice.billing_period || 'August 2026') : (billing_month || req.body.month || 'August 2026');
 
-    // Resolve PayU Config strictly from environment variables
-    const payuConfig = await payuService.getPayUConfig();
+    // Resolve PayU Config from database settings / environment
+    const dbPayuSetting = await db.getPayUSetting();
+    const payuConfig = await payuService.getPayUConfig(dbPayuSetting);
 
     // Check for duplicate pending transaction prevention
     const existingPending = await db.getPaymentByTxnId(transactionId);
@@ -1550,6 +1557,8 @@ app.post(['/api/payments/create-payu-payment', '/api/payment/create-payu-payment
       success: true,
       payuUrl: payuConfig.payuUrl,
       environment: payuConfig.environment,
+      portalUrl: payuConfig.portalUrl,
+      merchantKey: payuConfig.merchantKey,
       params: {
         key: payuConfig.merchantKey,
         txnid: transactionId,
@@ -1825,9 +1834,28 @@ app.post(['/api/settings/payment-gateway', '/api/admin/settings/payment-gateway'
   }
 });
 
+app.get(['/api/payments/gateway-info', '/api/payment/gateway-info'], async (req, res) => {
+  try {
+    const dbPayuSetting = await db.getPayUSetting();
+    const payuConfig = await payuService.getPayUConfig(dbPayuSetting);
+    res.json({
+      success: true,
+      gatewayName: 'PayU India',
+      environment: payuConfig.environment,
+      payuUrl: payuConfig.payuUrl,
+      portalUrl: payuConfig.portalUrl,
+      merchantKey: payuConfig.merchantKey,
+      allowedMethods: payuConfig.allowedMethods || ['UPI', 'CARD']
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.post(['/api/settings/payment-gateway/test', '/api/admin/settings/payment-gateway/test'], authenticateJWT, async (req, res) => {
   try {
-    const payuConfig = await payuService.getPayUConfig();
+    const dbPayuSetting = await db.getPayUSetting();
+    const payuConfig = await payuService.getPayUConfig(dbPayuSetting);
     const testTxnId = `TEST_${Date.now()}`;
     const testHash = payuService.generatePayUHash({
       key: payuConfig.merchantKey,
@@ -1841,11 +1869,12 @@ app.post(['/api/settings/payment-gateway/test', '/api/admin/settings/payment-gat
 
     res.json({
       success: true,
-      message: 'PayU Merchant Key & Salt credentials are valid and operational.',
+      message: `PayU (${payuConfig.environment.toUpperCase()} Mode) Merchant Key & Salt credentials are valid and operational.`,
       details: {
         environment: payuConfig.environment,
         merchantKey: payuConfig.merchantKey,
         payuUrl: payuConfig.payuUrl,
+        portalUrl: payuConfig.portalUrl,
         sampleTxnId: testTxnId,
         generatedHashPreview: `${testHash.slice(0, 20)}...`
       }

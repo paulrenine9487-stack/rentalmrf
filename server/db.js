@@ -1737,59 +1737,69 @@ const db = {
   },
 
   async getPayUSetting() {
-    // If backend environment variables are set, prioritize them
-    const envKey = (process.env.PAYU_MERCHANT_KEY || '').trim();
-    const envSalt = (process.env.PAYU_MERCHANT_SALT || '').trim();
+    // 1. Check database setting first if available
+    if (!useInMemory && dbPool) {
+      try {
+        await this.ensurePaymentGatewayTable();
+        const [rows] = await dbPool.query(`SELECT * FROM payment_gateway_settings WHERE gateway_name = 'PayU India' LIMIT 1`);
+        if (rows && rows.length > 0) {
+          const row = rows[0];
+          let allowedMethods = row.allowed_methods;
+          if (typeof allowedMethods === 'string') {
+            try {
+              allowedMethods = JSON.parse(allowedMethods);
+            } catch (e) {
+              allowedMethods = ['UPI', 'CARD'];
+            }
+          }
+          return {
+            ...row,
+            allowed_methods: Array.isArray(allowedMethods) ? allowedMethods : ['UPI', 'CARD']
+          };
+        }
+      } catch (err) {
+        // fallback to memory or env
+      }
+    }
+
+    // 2. Check in-memory configuration
+    if (this.inMemoryPayUSettings && this.inMemoryPayUSettings.merchant_key) {
+      return this.inMemoryPayUSettings;
+    }
+
+    // 3. Fallback to backend environment variables
+    const envKey = (process.env.PAYU_MERCHANT_KEY || 'gtKFFx').trim();
+    const envSalt = (process.env.PAYU_MERCHANT_SALT || 'eCwWELxi').trim();
     const envMode = (process.env.PAYU_ENVIRONMENT || 'test').trim();
 
-    if (envKey && envSalt) {
-      return {
-        id: 1,
-        gateway_name: 'PayU India',
-        status: 'ACTIVE',
-        environment: envMode,
-        merchant_key: envKey,
-        merchant_salt: envSalt,
-        allowed_methods: ['UPI', 'CARD']
-      };
-    }
-
-    if (useInMemory || !dbPool) {
-      return this.inMemoryPayUSettings;
-    }
-    try {
-      await this.ensurePaymentGatewayTable();
-      const [rows] = await dbPool.query(`SELECT * FROM payment_gateway_settings WHERE gateway_name = 'PayU India' LIMIT 1`);
-      if (rows && rows.length > 0) {
-        const row = rows[0];
-        let allowedMethods = row.allowed_methods;
-        if (typeof allowedMethods === 'string') {
-          try {
-            allowedMethods = JSON.parse(allowedMethods);
-          } catch (e) {
-            allowedMethods = ['UPI', 'CARD'];
-          }
-        }
-        return {
-          ...row,
-          allowed_methods: Array.isArray(allowedMethods) ? allowedMethods : ['UPI', 'CARD']
-        };
-      }
-      return this.inMemoryPayUSettings;
-    } catch (err) {
-      return this.inMemoryPayUSettings;
-    }
+    return {
+      id: 1,
+      gateway_name: 'PayU India',
+      status: 'ACTIVE',
+      environment: envMode,
+      merchant_key: envKey,
+      merchant_salt: envSalt,
+      allowed_methods: ['UPI', 'CARD']
+    };
   },
 
   async savePayUSetting({ environment, merchantKey, merchantSalt, allowedMethods }) {
     const current = await this.getPayUSetting();
-    const effectiveKey = merchantKey && merchantKey.trim() ? merchantKey.trim() : (process.env.PAYU_MERCHANT_KEY || current?.merchant_key || '');
+    const effectiveEnv = environment || current?.environment || process.env.PAYU_ENVIRONMENT || 'test';
+    const effectiveKey = merchantKey && merchantKey.trim() ? merchantKey.trim() : (current?.merchant_key || process.env.PAYU_MERCHANT_KEY || 'gtKFFx');
     const isMaskedSalt = !merchantSalt || merchantSalt.includes('*') || !merchantSalt.trim();
-    const effectiveSalt = isMaskedSalt ? (process.env.PAYU_MERCHANT_SALT || current?.merchant_salt || '') : merchantSalt.trim();
+    const effectiveSalt = isMaskedSalt ? (current?.merchant_salt || process.env.PAYU_MERCHANT_SALT || 'eCwWELxi') : merchantSalt.trim();
+
+    // Synchronize process.env for runtime consistency
+    process.env.PAYU_ENVIRONMENT = effectiveEnv;
+    process.env.PAYU_MERCHANT_KEY = effectiveKey;
+    process.env.PAYU_MERCHANT_SALT = effectiveSalt;
 
     this.inMemoryPayUSettings = {
       ...this.inMemoryPayUSettings,
-      environment: environment || process.env.PAYU_ENVIRONMENT || 'test',
+      gateway_name: 'PayU India',
+      status: 'ACTIVE',
+      environment: effectiveEnv,
       merchant_key: effectiveKey,
       merchant_salt: effectiveSalt,
       allowed_methods: allowedMethods || ['UPI', 'CARD']
@@ -1805,7 +1815,7 @@ const db = {
         `INSERT INTO payment_gateway_settings (gateway_name, status, environment, merchant_key, merchant_salt, allowed_methods)
          VALUES ('PayU India', 'ACTIVE', ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE environment = VALUES(environment), merchant_key = VALUES(merchant_key), merchant_salt = VALUES(merchant_salt), allowed_methods = VALUES(allowed_methods)`,
-        [environment || 'test', effectiveKey, effectiveSalt, JSON.stringify(allowedMethods || ['UPI', 'CARD'])]
+        [effectiveEnv, effectiveKey, effectiveSalt, JSON.stringify(allowedMethods || ['UPI', 'CARD'])]
       );
       return this.getPayUSetting();
     } catch (err) {

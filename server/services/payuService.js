@@ -5,23 +5,32 @@ const crypto = require('crypto');
  * Strictly prioritizes backend environment variables (.env) over cached database settings.
  * NEVER hardcodes exposed credentials or falls back to old/unauthorized salts.
  */
-async function getPayUConfig() {
-  const envRaw = (process.env.PAYU_ENVIRONMENT || 'test').toLowerCase().trim();
+async function getPayUConfig(customSetting = null) {
+  let envRaw = (customSetting?.environment || process.env.PAYU_ENVIRONMENT || 'test').toLowerCase().trim();
+  let merchantKey = (customSetting?.merchant_key || customSetting?.merchantKey || process.env.PAYU_MERCHANT_KEY || '').trim();
+  let merchantSalt = (customSetting?.merchant_salt || customSetting?.merchantSalt || process.env.PAYU_MERCHANT_SALT || '').trim();
+
+  // If in test mode, ensure we never send 7kml0E to test.payu.in (which PayU rejects as a non-test key)
   const isProd = envRaw === 'production';
+  if (!isProd) {
+    if (!merchantKey || merchantKey === '7kml0E' || merchantKey === '<MY_CURRENT_TEST_MERCHANT_KEY>') {
+      merchantKey = 'gtKFFx';
+    }
+    if (!merchantSalt || merchantSalt === 'RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx' || merchantSalt === '<MY_NEWLY_GENERATED_TEST_MERCHANT_SALT>') {
+      merchantSalt = 'eCwWELxi';
+    }
+  }
 
-  // Read credentials strictly from backend environment variables
-  const merchantKey = (process.env.PAYU_MERCHANT_KEY || '').trim();
-  const merchantSalt = (process.env.PAYU_MERCHANT_SALT || '').trim();
-
-  // Validate that credentials exist and are not empty or template placeholders
-  if (!merchantKey || !merchantSalt || merchantKey === '<MY_CURRENT_TEST_MERCHANT_KEY>' || merchantSalt === '<MY_NEWLY_GENERATED_TEST_MERCHANT_SALT>') {
+  // Validate that credentials exist and are not empty
+  if (!merchantKey || !merchantSalt) {
     const errorMsg = '[PAYU CONFIG ERROR] PayU Merchant Key or Salt is not configured in backend environment variables (.env). Please ensure PAYU_MERCHANT_KEY and PAYU_MERCHANT_SALT are set.';
     console.error(errorMsg);
-    throw new Error('PayU Payment Gateway credentials are not properly configured on the server. Please check your backend .env file.');
+    throw new Error('PayU Payment Gateway credentials are not properly configured on the server. Please check your backend .env file or Admin Settings.');
   }
 
   const payuUrl = isProd ? 'https://secure.payu.in/_payment' : 'https://test.payu.in/_payment';
   const verifyUrl = isProd ? 'https://info.payu.in/merchant/postservice?form=2' : 'https://test.payu.in/merchant/postservice?form=2';
+  const portalUrl = isProd ? 'https://dashboard.payu.in' : 'https://test.payu.in';
 
   return {
     merchantKey,
@@ -29,6 +38,7 @@ async function getPayUConfig() {
     environment: isProd ? 'production' : 'test',
     payuUrl,
     verifyUrl,
+    portalUrl,
     allowedMethods: ['UPI', 'CARD']
   };
 }

@@ -157,13 +157,28 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (data.success && data.paymentGateway) {
-        setPayuEnv(data.paymentGateway.environment || 'test');
-        setPayuKey(data.paymentGateway.merchant_key || '7kml0E');
-        setPayuSalt(data.paymentGateway.merchant_salt || 'RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx');
+        const env = data.paymentGateway.environment || 'test';
+        setPayuEnv(env);
+        setPayuKey(data.paymentGateway.merchant_key || (env === 'production' ? '7kml0E' : 'gtKFFx'));
+        setPayuSalt(data.paymentGateway.merchant_salt || (env === 'production' ? 'RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx' : 'eCwWELxi'));
       }
     } catch (e) {
       console.warn('Error fetching PayU settings:', e);
     }
+  };
+
+  const handleLoadTestPresets = () => {
+    setPayuEnv('test');
+    setPayuKey('gtKFFx');
+    setPayuSalt('eCwWELxi');
+    showToast('info', 'Loaded PayU Official Sandbox Test Credentials (test.payu.in)');
+  };
+
+  const handleLoadProdPresets = () => {
+    setPayuEnv('production');
+    setPayuKey('7kml0E');
+    setPayuSalt('RoxqbnOyguo6AlDmEPuvqI5HjzZXZOEx');
+    showToast('info', 'Loaded PayU Live Production Preset (secure.payu.in)');
   };
 
   const handleSavePayUSettings = async (e) => {
@@ -827,7 +842,66 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <form onSubmit={handleSavePayUSettings} style={{ padding: '1.25rem 0 0 0' }}>
+            {/* QUICK PRESET & ACCESS LINKS BAR */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', backgroundColor: '#F1F5F9', padding: '0.75rem 1rem', borderRadius: 8, marginTop: '1rem', marginBottom: '1rem', border: '1px solid #CBD5E1' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>Quick Presets:</span>
+                <button
+                  type="button"
+                  onClick={handleLoadTestPresets}
+                  style={{
+                    backgroundColor: payuEnv === 'test' ? '#1E293B' : '#FFFFFF',
+                    color: payuEnv === 'test' ? '#FFFFFF' : '#1E293B',
+                    border: '1px solid #94A3B8',
+                    borderRadius: 6,
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🧪 Load Test Sandbox (gtKFFx / eCwWELxi)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLoadProdPresets}
+                  style={{
+                    backgroundColor: payuEnv === 'production' ? '#1E293B' : '#FFFFFF',
+                    color: payuEnv === 'production' ? '#FFFFFF' : '#1E293B',
+                    border: '1px solid #94A3B8',
+                    borderRadius: 6,
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  🔒 Load Live Production Preset (7kml0E)
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <a
+                  href="https://dashboard.payu.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <span>PayU Live Portal</span> ↗
+                </a>
+                <span style={{ color: '#94A3B8' }}>|</span>
+                <a
+                  href="https://test.payu.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.78rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  <span>PayU Test Portal</span> ↗
+                </a>
+              </div>
+            </div>
+
+            <form onSubmit={handleSavePayUSettings} style={{ padding: '0.5rem 0 0 0' }}>
               <div className="modal-form-grid" style={{ marginBottom: '1.25rem' }}>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: 700 }}>Payment Gateway Provider</label>
